@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Data Spark · Graphics Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Permanent+Marker&family=Zeyada&family=La+Belle+Aurore&family=Shadows+Into+Light&family=Archivo:wght@500;600;700&family=EB+Garamond:ital,wght@0,400;1,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #212123;
+    --deep: #0B3042;
+    --cream: #fef6e2;
+    --mist: #d8dede;
+    --orange: #ee6a2d;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--ink);
+    color: var(--cream);
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+  }
+  aside {
+    width: 380px;
+    min-width: 380px;
+    height: 100vh;
+    overflow-y: auto;
+    padding: 24px 20px 60px;
+    background: #1a1a1c;
+    border-right: 1px solid #333;
+  }
+  aside h1 {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  aside .sub {
+    font-size: 11px;
+    color: #8e8d8b;
+    margin-bottom: 20px;
+  }
+  section { margin-bottom: 22px; }
+  section > label.head {
+    display: block;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #8e8d8b;
+    margin-bottom: 8px;
+  }
+  .tpl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .tpl-grid button {
+    background: #26262a;
+    color: var(--mist);
+    border: 1px solid #333;
+    border-radius: 8px;
+    padding: 10px 8px;
+    font-size: 11px;
+    font-family: inherit;
+    cursor: pointer;
+    text-align: left;
+    line-height: 1.35;
+  }
+  .tpl-grid button.active {
+    border-color: var(--orange);
+    color: var(--cream);
+    background: #2d2620;
+  }
+  .tpl-grid button span { display: block; font-size: 9px; color: #8e8d8b; margin-top: 2px; }
+  .photo-grid { display: flex; gap: 6px; flex-wrap: wrap; }
+  .photo-grid .ph {
+    width: 62px; height: 62px;
+    border-radius: 8px;
+    border: 2px solid transparent;
+    background-size: cover;
+    background-position: center;
+    cursor: pointer;
+    padding: 0;
+  }
+  .photo-grid .ph.active { border-color: var(--orange); }
+  .photo-grid .up {
+    width: 62px; height: 62px;
+    border-radius: 8px;
+    border: 1px dashed #555;
+    background: none;
+    color: #8e8d8b;
+    font-size: 20px;
+    cursor: pointer;
+  }
+  .row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .row label { font-size: 11px; color: var(--mist); width: 110px; flex-shrink: 0; }
+  .row input[type=range] { flex: 1; accent-color: var(--orange); }
+  .row .val { font-size: 10px; color: #8e8d8b; width: 30px; text-align: right; }
+  .field { margin-bottom: 10px; }
+  .field label {
+    display: block;
+    font-size: 11px;
+    color: var(--mist);
+    margin-bottom: 4px;
+  }
+  .field input[type=text], .field input[type=password], .field textarea {
+    width: 100%;
+    background: #26262a;
+    border: 1px solid #333;
+    border-radius: 6px;
+    color: var(--cream);
+    font-family: inherit;
+    font-size: 12px;
+    padding: 7px 9px;
+    resize: vertical;
+  }
+  .field textarea { min-height: 54px; }
+  .field input:focus, .field textarea:focus { outline: none; border-color: var(--orange); }
+  .swatches { display: flex; gap: 6px; flex-wrap: wrap; }
+  .swatches button {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    cursor: pointer;
+    padding: 0;
+  }
+  .swatches button.active { border-color: #fff; box-shadow: 0 0 0 2px var(--ink), 0 0 0 3px #fff; }
+  .check { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--mist); margin-bottom: 8px; cursor: pointer; }
+  .check input { accent-color: var(--orange); }
+  .btn {
+    display: block;
+    width: 100%;
+    background: var(--orange);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 13px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    letter-spacing: 0.03em;
+  }
+  .btn:hover { filter: brightness(1.08); }
+  .btn.ghost {
+    background: #26262a;
+    color: var(--mist);
+    border: 1px solid #444;
+    padding: 9px;
+    font-size: 11px;
+    font-weight: 500;
+    margin-bottom: 8px;
+  }
+  main {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background:
+      radial-gradient(circle at 30% 20%, #2a2a2e 0%, var(--ink) 70%);
+  }
+  #stage {
+    max-height: calc(100vh - 48px);
+    max-width: 100%;
+    aspect-ratio: 4 / 5;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+    border-radius: 4px;
+  }
+  hr { border: none; border-top: 1px solid #333; margin: 18px 0; }
+</style>
+</head>
+<body>
+  <aside>
+    <h1>Data Spark · Graphics Studio</h1>
+    <div class="sub">Foto tua + copy tuo. Layout e palette bloccati.</div>
+
+    <section>
+      <label class="head">Template</label>
+      <div class="tpl-grid" id="tplGrid"></div>
+    </section>
+
+    <section>
+      <label class="head">Foto (il soggetto sei tu)</label>
+      <div class="photo-grid" id="photoGrid"></div>
+      <input type="file" id="photoUpload" accept="image/*" hidden>
+    </section>
+
+    <section>
+      <label class="head">Inquadratura foto</label>
+      <div id="photoAdjust"></div>
+    </section>
+
+    <section>
+      <label class="head">Copy & opzioni template</label>
+      <div id="fields"></div>
+    </section>
+
+    <hr>
+    <button class="btn" id="exportBtn">Scarica PNG (1080×1350)</button>
+  </aside>
+
+  <main>
+    <canvas id="stage" width="1080" height="1350"></canvas>
+  </main>
+
+<script src="app.js"></script>
+</body>
+</html>
