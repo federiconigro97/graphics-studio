@@ -2,9 +2,21 @@
    7 template fissi ricreati dalle reference. Si cambia solo: foto (soggetto) + copy.
    Palette bloccata sui brand colors. Logo spark al posto di stelle/simboli. */
 
-const W = 1080, H = 1350;
+const W = 1080;
+let H = 1350;                    // 1350 = 4:5 feed, 1920 = 9:16 story
+let FORMAT = '4:5';
+const sy = v => v * H / 1350;    // scala le y di layout sul formato attivo
 const canvas = document.getElementById('stage');
 const ctx = canvas.getContext('2d');
+
+function setFormat(f) {
+  FORMAT = f;
+  H = f === '9:16' ? 1920 : 1350;
+  canvas.height = H;
+  canvas.style.aspectRatio = f === '9:16' ? '9 / 16' : '4 / 5';
+  buildAdjust();
+  render();
+}
 
 const BRAND = ['#7b98a8','#0B3042','#C6A890','#fef6e2','#b6b394','#8e8d8b','#518fa6','#ee6a2d','#f43334','#212123','#d8dede'];
 
@@ -336,18 +348,18 @@ const TEMPLATES = [
       c.fillStyle = 'rgba(20,15,10,0.14)';
       c.fillRect(0, 0, W, H);
       c.restore();
-      const k = s.inkColor;
-      drawHand(c, { text: s.name, x: 780, y: 150, size: 76, rot: -7, color: k, seed: 11 });
-      drawHand(c, { text: s.sub, x: 850, y: 330, size: 40, rot: -5, color: k, seed: 12 });
-      drawHand(c, { text: s.leftTop, x: 215, y: 230, size: 36, rot: -8, color: k, seed: 13 });
-      drawHand(c, { text: s.leftList, x: 55, y: 750, size: 40, rot: -2, color: k, align: 'left', lh: 1.55, seed: 14 });
-      drawHand(c, { text: s.rightPlus, x: 670, y: 500, size: 38, rot: -4, color: k, align: 'left', lh: 1.5, seed: 15 });
-      drawHand(c, { text: s.rightQuote, x: 880, y: 950, size: 40, rot: -11, color: k, seed: 16 });
-      drawHand(c, { text: s.bottom, x: 560, y: 1160, size: 48, rot: -3, color: k, seed: 17 });
-      if (s.leftTop.trim()) drawArrow(c, 250, 330, 330, 450, -40, k);
-      if (s.name.trim()) drawArrow(c, 640, 210, 545, 320, 30, k);
-      if (s.bottom.trim()) drawArrow(c, 420, 1130, 450, 1020, 35, k);
-      if (s.rightQuote.trim()) drawArrow(c, 840, 890, 750, 830, -25, k);
+      const k = s.inkColor, T = (s.tsize || 100) / 100;
+      drawHand(c, { text: s.name, x: 780, y: sy(150), size: 76 * T, rot: -7, color: k, seed: 11 });
+      drawHand(c, { text: s.sub, x: 850, y: sy(330), size: 40 * T, rot: -5, color: k, seed: 12 });
+      drawHand(c, { text: s.leftTop, x: 215, y: sy(230), size: 36 * T, rot: -8, color: k, seed: 13 });
+      drawHand(c, { text: s.leftList, x: 55, y: sy(750), size: 40 * T, rot: -2, color: k, align: 'left', lh: 1.55, seed: 14 });
+      drawHand(c, { text: s.rightPlus, x: 670, y: sy(500), size: 38 * T, rot: -4, color: k, align: 'left', lh: 1.5, seed: 15 });
+      drawHand(c, { text: s.rightQuote, x: 880, y: sy(950), size: 40 * T, rot: -11, color: k, seed: 16 });
+      drawHand(c, { text: s.bottom, x: 560, y: sy(1160), size: 48 * T, rot: -3, color: k, seed: 17 });
+      if (s.leftTop.trim()) drawArrow(c, 250, sy(330), 330, sy(450), -40, k);
+      if (s.name.trim()) drawArrow(c, 640, sy(210), 545, sy(320), 30, k);
+      if (s.bottom.trim()) drawArrow(c, 420, sy(1130), 450, sy(1020), 35, k);
+      if (s.rightQuote.trim()) drawArrow(c, 840, sy(890), 750, sy(830), -25, k);
       if (s.showLogo) drawLogo(c, 80, 90, 80, k);
       drawGrain(c, 0.05);
     }
@@ -380,20 +392,21 @@ const TEMPLATES = [
         }
       }
       c.restore();
+      const T = (s.tsize || 100) / 100;
       c.save();
       c.fillStyle = s.txtColor;
       c.textBaseline = 'alphabetic';
-      letterSpace(c, 1.5);
-      setFont(c, 700, 26, SANS);
+      letterSpace(c, 1.5 * T);
+      setFont(c, 700, 26 * T, SANS);
       const credit = s.credit.toUpperCase().split('\n');
-      credit.forEach((l, i) => c.fillText(l, 160, 640 + i * 34));
-      c.fillText(s.title.toUpperCase(), 590, 640);
-      setFont(c, 500, 26, SANS);
+      credit.forEach((l, i) => c.fillText(l, 160, sy(640) + i * 34 * T));
+      c.fillText(s.title.toUpperCase(), 590, sy(640));
+      setFont(c, 500, 26 * T, SANS);
       const sub = wrapLines(c, s.subtitle.toUpperCase(), 400);
-      sub.forEach((l, i) => c.fillText(l.join(' '), 590, 674 + i * 34));
+      sub.forEach((l, i) => c.fillText(l.join(' '), 590, sy(640) + (i + 1) * 34 * T));
       letterSpace(c, 0);
       c.restore();
-      if (s.showLogo) drawLogo(c, W / 2, 1270, 60, s.txtColor);
+      if (s.showLogo) drawLogo(c, W / 2, H - 80, 60, s.txtColor);
       drawGrain(c, 0.07);
     }
   },
@@ -412,7 +425,7 @@ const TEMPLATES = [
         action: (s, setStatus) => generateAvatar(s, setStatus) },
       { key: 'overlaySign', label: 'Cartello disegnato dall\'app (spegnilo se il testo lo ha già scritto Gemini)', type: 'check', def: true },
       { key: 'signX', label: 'Cartello ↔', type: 'range', def: 540, min: 100, max: 980 },
-      { key: 'signY', label: 'Cartello ↕', type: 'range', def: 350, min: 100, max: 1100 },
+      { key: 'signY', label: 'Cartello ↕', type: 'range', def: 350, min: 100, max: 1750 },
       { key: 'signW', label: 'Larghezza cartello', type: 'range', def: 460, min: 240, max: 820 },
       { key: 'signRot', label: 'Rotazione', type: 'range', def: -2, min: -15, max: 15 },
       { key: 'inkColor', label: 'Colore marker', type: 'swatch', def: '#f43334' },
@@ -423,7 +436,7 @@ const TEMPLATES = [
       if (!s.overlaySign) { drawGrain(c, 0.05); return; }
       const lines = s.signText.split('\n').filter(l => l.trim());
       const pad = 34;
-      let size = 64;
+      let size = 64 * (s.tsize || 100) / 100;
       for (const l of lines) size = Math.min(size, fitSize(c, l, size, s.signW - pad * 2, 400, "'Permanent Marker'"));
       const lh = size * 1.28;
       const signH = lines.length * lh + pad * 2 + (s.showLogo ? size * 0.9 : 0);
@@ -468,10 +481,10 @@ const TEMPLATES = [
       c.fillStyle = s.bgColor;
       c.fillRect(0, 0, W, H);
       drawGrain(c, 0.12);
-      const cy = s.caption.trim() ? 600 : 650;
+      const cy = s.caption.trim() ? sy(600) : sy(650);
       const cut = cutouts[s.photo];
       if (cut) {
-        const scale = (950 / cut.naturalHeight) * (s.cutSize / 100) * s.zoom;
+        const scale = (sy(950) / cut.naturalHeight) * (s.cutSize / 100) * s.zoom;
         const w = cut.naturalWidth * scale, h = cut.naturalHeight * scale;
         drawSticker(c, cut, 540 - w / 2 + s.ox / 100 * W, cy - h / 2 + s.oy / 100 * H, w, h, 18);
       } else {
@@ -490,9 +503,9 @@ const TEMPLATES = [
         c.restore();
       }
       if (s.caption.trim()) {
-        drawHand(c, { text: s.caption, x: 540, y: 1170, size: 52, rot: -2, color: s.capColor, seed: 21 });
+        drawHand(c, { text: s.caption, x: 540, y: H - 180, size: 52 * (s.tsize || 100) / 100, rot: -2, color: s.capColor, seed: 21 });
       }
-      if (s.showLogo) drawLogo(c, W / 2, 1272, 66, s.capColor);
+      if (s.showLogo) drawLogo(c, W / 2, H - 78, 66, s.capColor);
       drawGrain(c, 0.06);
     }
   },
@@ -514,16 +527,17 @@ const TEMPLATES = [
       c.filter = `blur(${s.blur}px) saturate(1.08) brightness(1.02)`;
       coverDraw(c, img, s.zoom * (1 + s.blur / 200), s.ox, s.oy);
       c.restore();
-      setFont(c, 500, s.size, SANS);
+      const size = s.size * (s.tsize || 100) / 100;
+      setFont(c, 500, size, SANS);
       letterSpace(c, 2);
       const lines = wrapLines(c, s.headline.toUpperCase(), 900).length;
       letterSpace(c, 0);
-      const blockH = lines * s.size * 1.18;
+      const blockH = lines * size * 1.18;
       drawJustified(c, {
-        text: s.headline, x: 90, y: (H - blockH) / 2 + s.size * 0.55, width: 900,
-        size: s.size, color: s.txtColor, lh: 1.18, weight: 500, ls: 2
+        text: s.headline, x: 90, y: (H - blockH) / 2 + size * 0.55, width: 900,
+        size, color: s.txtColor, lh: 1.18, weight: 500, ls: 2
       });
-      if (s.showLogo) drawLogo(c, W / 2, 1240, 64, s.txtColor);
+      if (s.showLogo) drawLogo(c, W / 2, H - 110, 64, s.txtColor);
       drawGrain(c, 0.05);
     }
   },
@@ -538,12 +552,12 @@ const TEMPLATES = [
       { key: 'cardColor', label: 'Colore card', type: 'swatch', def: '#518fa6' },
       { key: 'txtColor', label: 'Colore testo', type: 'swatch', def: '#fef6e2' },
       { key: 'cardW', label: 'Larghezza card', type: 'range', def: 620, min: 400, max: 900 },
-      { key: 'cardH', label: 'Altezza card', type: 'range', def: 780, min: 400, max: 1100 },
+      { key: 'cardH', label: 'Altezza card', type: 'range', def: 780, min: 400, max: 1600 },
       { key: 'showLogo', label: 'Logo spark sulla card', type: 'check', def: true },
     ],
     draw(c, s, img) {
       coverDraw(c, img, s.zoom, s.ox, s.oy);
-      const cx = 540, cy = 620;
+      const cx = 540, cy = sy(620);
       c.save();
       c.shadowColor = 'rgba(0,0,0,0.3)';
       c.shadowBlur = 30;
@@ -557,7 +571,7 @@ const TEMPLATES = [
       c.clip();
       drawGrain(c, 0.14);
       c.restore();
-      const size = 46;
+      const size = 46 * (s.tsize || 100) / 100;
       setFont(c, 500, size, SANS);
       letterSpace(c, 1.5);
       const nLines = wrapLines(c, s.headline.toUpperCase(), 900).length;
@@ -594,13 +608,14 @@ const TEMPLATES = [
         [280, 1010], [790, 1130], [520, 420], [520, 900]
       ];
       const rnd = mulberry32(s.seed * 97 + 13);
+      const T = (s.tsize || 100) / 100;
       words.forEach((w, i) => {
         const [ax, ay] = anchors[i % anchors.length];
-        const size = fitSize(c, w, 280 - (rnd() * 40), 480, 400, SCRIPT);
+        const size = fitSize(c, w, (280 - rnd() * 40) * T, 480, 400, SCRIPT);
         drawHand(c, {
           text: w,
           x: ax + (rnd() - 0.5) * 60,
-          y: ay + (rnd() - 0.5) * 50,
+          y: sy(ay) + (rnd() - 0.5) * 50,
           size, rot: (rnd() - 0.5) * 24,
           color: s.wordColor, family: SCRIPT, seed: s.seed + i
         });
@@ -612,12 +627,12 @@ const TEMPLATES = [
         c.textBaseline = 'middle';
         c.shadowColor = 'rgba(0,0,0,0.5)';
         c.shadowBlur = 16;
-        setFont(c, 400, 46, SERIF);
+        setFont(c, 400, 46 * T, SERIF);
         const lines = s.centerText.split('\n');
-        lines.forEach((l, i) => c.fillText(l, 620, 700 + i * 62));
+        lines.forEach((l, i) => c.fillText(l, 620, sy(700) + i * 62 * T));
         c.restore();
       }
-      if (s.showLogo) drawLogo(c, W / 2, 1275, 60, s.wordColor);
+      if (s.showLogo) drawLogo(c, W / 2, H - 75, 60, s.wordColor);
       drawGrain(c, 0.06);
     }
   },
@@ -645,7 +660,7 @@ function loadImg(src) {
 const states = {};
 function stateFor(tpl) {
   if (!states[tpl.id]) {
-    const s = { photo: tpl.defaultPhoto, zoom: 1, ox: 0, oy: 0 };
+    const s = { photo: tpl.defaultPhoto, zoom: 1, ox: 0, oy: 0, tsize: 100 };
     tpl.fields.forEach(f => s[f.key] = f.def);
     states[tpl.id] = s;
   }
@@ -742,8 +757,23 @@ function sliderRow(label, value, min, max, step, oninput) {
 
 function buildAdjust() {
   const s = stateFor(current);
+  if (s.tsize === undefined) s.tsize = 100;
   photoAdjust.innerHTML = '';
+  const fmtRow = document.createElement('div');
+  fmtRow.className = 'row';
+  const lab = document.createElement('label');
+  lab.textContent = 'Formato';
+  fmtRow.appendChild(lab);
+  [['4:5', '4:5 feed'], ['9:16', '9:16 story']].forEach(([f, name]) => {
+    const b = document.createElement('button');
+    b.textContent = name;
+    b.className = 'fmt' + (FORMAT === f ? ' active' : '');
+    b.onclick = () => setFormat(f);
+    fmtRow.appendChild(b);
+  });
   photoAdjust.append(
+    fmtRow,
+    sliderRow('Dimensione testi %', s.tsize, 60, 180, 1, v => s.tsize = v),
     sliderRow('Zoom', s.zoom, 1, 3, 0.02, v => s.zoom = v),
     sliderRow('Sposta ↔', s.ox, -60, 60, 1, v => s.ox = v),
     sliderRow('Sposta ↕', s.oy, -60, 60, 1, v => s.oy = v),
@@ -841,7 +871,7 @@ function buildAll() {
 /* ---------- export ---------- */
 document.getElementById('exportBtn').onclick = () => {
   const a = document.createElement('a');
-  a.download = `dataspark-${current.id}-${new Date().toISOString().slice(0, 10)}.png`;
+  a.download = `dataspark-${current.id}-${FORMAT.replace(':', 'x')}-${new Date().toISOString().slice(0, 10)}.png`;
   a.href = canvas.toDataURL('image/png');
   a.click();
 };
