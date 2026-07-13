@@ -14,6 +14,7 @@ function setFormat(f) {
   H = f === '9:16' ? 1920 : 1350;
   canvas.height = H;
   canvas.style.aspectRatio = f === '9:16' ? '9 / 16' : '4 / 5';
+  document.getElementById('exportBtn').textContent = `Scarica PNG (${W}×${H})`;
   buildAdjust();
   render();
 }
