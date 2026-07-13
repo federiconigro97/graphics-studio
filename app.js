@@ -82,28 +82,139 @@ function wrapLines(c, text, maxW) {
   return lines;
 }
 
+/* ---------- evidenziatore: *parola* nel testo = banda colore dietro la parola ---------- */
+const stripMarks = s => s.replace(/\*/g, '');
+
+function parseMarks(str) {
+  const segs = [];
+  str.split('*').forEach((seg, i) => {
+    if (seg) segs.push({ t: seg, hl: i % 2 === 1 });
+  });
+  return segs;
+}
+
+/* evidenziazione organica: 'nastro' (strisce marker piene, sbordi irregolari)
+   o 'cerchio' (ellisse a penna sketchy, doppio giro) */
+function drawHighlight(c, x, y, w, h, color, style, seed) {
+  const rnd = mulberry32(seed);
+  c.save();
+  if (style === 'cerchio') {
+    c.strokeStyle = color;
+    c.lineWidth = Math.max(3, h * 0.07);
+    c.lineCap = 'round';
+    c.lineJoin = 'round';
+    const cx = x + w / 2, cy = y + h / 2;
+    const rx = w / 2 + h * 0.45, ry = h * 0.80;
+    const p1 = rnd() * 6.28, p2 = rnd() * 6.28;
+    const a0 = -0.4 + (rnd() - 0.5) * 0.6;
+    const steps = 64, loops = 2;
+    c.beginPath();
+    for (let i = 0; i <= steps * loops; i++) {
+      const t = a0 + i / steps * Math.PI * 2;
+      const j = 1 + 0.06 * Math.sin(t * 2.3 + p1) + 0.045 * Math.sin(t * 4.7 + p2) + (i / (steps * loops)) * 0.06;
+      const px = cx + Math.cos(t) * rx * j;
+      const py = cy + Math.sin(t) * ry * (j + 0.06 * Math.sin(t * 3.1 + p2));
+      i === 0 ? c.moveTo(px, py) : c.lineTo(px, py);
+    }
+    c.stroke();
+  } else {
+    // nastro: 2 strisce sovrapposte, lunghezze/altezze leggermente diverse
+    c.fillStyle = color;
+    for (let k = 0; k < 2; k++) {
+      const exL = h * (0.12 + rnd() * 0.45);
+      const exR = h * (0.12 + rnd() * 0.45);
+      const oy = (rnd() - 0.5) * h * 0.14;
+      const hh = h * (0.85 + rnd() * 0.22);
+      c.fillRect(x - exL, y + oy + (h - hh) / 2, w + exL + exR, hh);
+    }
+  }
+  c.restore();
+}
+
+/* riga singola col font corrente, con evidenziazioni; baseline 'alphabetic' o 'middle' */
+function drawMarkedLine(c, line, x, y, size, hlColor, align = 'left', baseline = 'alphabetic', hlStyle = 'nastro') {
+  const segs = parseMarks(line);
+  const total = segs.reduce((a, s) => a + c.measureText(s.t).width, 0);
+  const startX = align === 'center' ? x - total / 2 : x;
+  const prevAlign = c.textAlign;
+  c.textAlign = 'left';
+  const top = baseline === 'middle' ? y - size * 0.52 : y - size * 0.78;
+  // segmenti evidenziati adiacenti uniti in un unico run
+  const rects = [];
+  let cx = startX, run = null;
+  for (const s of segs) {
+    const w = c.measureText(s.t).width;
+    if (s.hl) {
+      if (!run) run = { x: cx, w: 0 };
+      run.w = cx + w - run.x;
+    } else if (run) { rects.push(run); run = null; }
+    cx += w;
+  }
+  if (run) rects.push(run);
+  const seedOf = r => Math.abs((r.x * 7 + y * 3 + r.w) | 0) + 1;
+  if (hlColor && hlStyle !== 'cerchio')
+    rects.forEach(r => drawHighlight(c, r.x, top, r.w, size * 1.04, hlColor, hlStyle, seedOf(r)));
+  cx = startX;
+  for (const s of segs) {
+    c.fillText(s.t, cx, y);
+    cx += c.measureText(s.t).width;
+  }
+  if (hlColor && hlStyle === 'cerchio')
+    rects.forEach(r => drawHighlight(c, r.x, top, r.w, size * 1.04, hlColor, hlStyle, seedOf(r)));
+  c.textAlign = prevAlign;
+}
+
 /* force-justified uppercase block (ogni riga stirata a piena larghezza, come le reference) */
 function drawJustified(c, opts) {
-  const { text, x, y, width, size, color, lh = 1.35, weight = 500, family = SANS, ls = 2 } = opts;
+  const { text, x, y, width, size, color, lh = 1.35, weight = 500, family = SANS, ls = 2, hl, hlStyle = 'nastro' } = opts;
   c.save();
   setFont(c, weight, size, family);
   letterSpace(c, ls);
   c.fillStyle = color;
   c.textBaseline = 'alphabetic';
-  const lines = wrapLines(c, text.toUpperCase(), width);
+  // parole con flag evidenziatore (*parola*)
+  const words = [];
+  text.toUpperCase().split('*').forEach((seg, i) => {
+    seg.split(/\s+/).filter(Boolean).forEach(t => words.push({ t, hl: i % 2 === 1 }));
+  });
+  const lines = [];
+  let line = [];
+  for (const w of words) {
+    const test = [...line.map(o => o.t), w.t].join(' ');
+    if (line.length && c.measureText(test).width > width) {
+      lines.push(line);
+      line = [w];
+    } else line.push(w);
+  }
+  if (line.length) lines.push(line);
   let cy = y;
   for (const line of lines) {
-    if (line.length === 1) {
-      c.fillText(line[0], x, cy);
-    } else {
-      const wordsW = line.reduce((a, w) => a + c.measureText(w).width, 0);
-      const gap = (width - wordsW) / (line.length - 1);
-      let cx = x;
-      for (const w of line) {
-        c.fillText(w, cx, cy);
-        cx += c.measureText(w).width + gap;
-      }
+    const wordsW = line.reduce((a, o) => a + c.measureText(o.t).width, 0);
+    const gap = line.length > 1 ? (width - wordsW) / (line.length - 1) : 0;
+    // run di parole evidenziate consecutive (gap inclusi)
+    const runs = [];
+    {
+      let cx = x, run = null;
+      line.forEach(o => {
+        const w = c.measureText(o.t).width;
+        if (o.hl) {
+          if (!run) run = { x: cx, w: 0 };
+          run.w = cx + w - run.x;
+        } else if (run) { runs.push(run); run = null; }
+        cx += w + gap;
+      });
+      if (run) runs.push(run);
     }
+    const seedOf = r => Math.abs((r.x * 7 + cy * 3 + r.w) | 0) + 1;
+    if (hl && hlStyle !== 'cerchio')
+      runs.forEach(r => drawHighlight(c, r.x, cy - size * 0.78, r.w, size * 1.02, hl, hlStyle, seedOf(r)));
+    let cx = x;
+    for (const o of line) {
+      c.fillText(o.t, cx, cy);
+      cx += c.measureText(o.t).width + gap;
+    }
+    if (hl && hlStyle === 'cerchio')
+      runs.forEach(r => drawHighlight(c, r.x, cy - size * 0.78, r.w, size * 1.02, hl, hlStyle, seedOf(r)));
     cy += size * lh;
   }
   letterSpace(c, 0);
@@ -114,7 +225,7 @@ function drawJustified(c, opts) {
 /* handwritten multi-line slot with per-line jitter */
 function drawHand(c, opts) {
   const { text, x, y, size, rot = 0, color, align = 'center', lh = 1.35,
-          family = MARKER, weight = 400, seed = 1 } = opts;
+          family = MARKER, weight = 400, seed = 1, jitter = true, hl, hlStyle = 'nastro' } = opts;
   if (!text || !text.trim()) return;
   const rnd = mulberry32(seed);
   c.save();
@@ -126,10 +237,15 @@ function drawHand(c, opts) {
   const lines = text.split('\n');
   lines.forEach((line, i) => {
     c.save();
-    c.rotate((rnd() - 0.5) * 0.05);
-    c.translate((rnd() - 0.5) * size * 0.25, i * size * lh);
+    if (jitter) {
+      c.rotate((rnd() - 0.5) * 0.05);
+      c.translate((rnd() - 0.5) * size * 0.25, i * size * lh);
+    } else {
+      rnd(); rnd();
+      c.translate(0, i * size * lh);
+    }
     setFont(c, weight, size, family);
-    c.fillText(line, 0, 0);
+    drawMarkedLine(c, line, 0, 0, size, hl, align, 'middle', hlStyle);
     c.restore();
   });
   c.restore();
@@ -340,6 +456,9 @@ const TEMPLATES = [
       { key: 'rightQuote', label: 'Nota bassa a dx', type: 'text', def: '"the project"' },
       { key: 'bottom', label: 'Riga in basso', type: 'textarea', def: '+6 anni nel\ndigitale' },
       { key: 'inkColor', label: 'Colore scritte', type: 'swatch', def: '#ee6a2d' },
+      { key: 'modern', label: 'Font moderno (Helvetica, niente marker)', type: 'check', def: false },
+      { key: 'hlColor', label: 'Evidenziatore (*parola* nel testo)', type: 'swatch', def: '#fef6e2' },
+      { key: 'hlCircle', label: 'Evidenzia a cerchio (invece del nastro)', type: 'check', def: false },
       { key: 'showLogo', label: 'Logo spark in alto a sx', type: 'check', def: true },
     ],
     draw(c, s, img) {
@@ -348,14 +467,18 @@ const TEMPLATES = [
       c.fillStyle = 'rgba(20,15,10,0.14)';
       c.fillRect(0, 0, W, H);
       c.restore();
-      const k = s.inkColor, T = (s.tsize || 100) / 100;
-      drawHand(c, { text: s.name, x: 780, y: sy(150), size: 76 * T, rot: -7, color: k, seed: 11 });
-      drawHand(c, { text: s.sub, x: 850, y: sy(330), size: 40 * T, rot: -5, color: k, seed: 12 });
-      drawHand(c, { text: s.leftTop, x: 215, y: sy(230), size: 36 * T, rot: -8, color: k, seed: 13 });
-      drawHand(c, { text: s.leftList, x: 55, y: sy(750), size: 40 * T, rot: -2, color: k, align: 'left', lh: 1.55, seed: 14 });
-      drawHand(c, { text: s.rightPlus, x: 670, y: sy(500), size: 38 * T, rot: -4, color: k, align: 'left', lh: 1.5, seed: 15 });
-      drawHand(c, { text: s.rightQuote, x: 880, y: sy(950), size: 40 * T, rot: -11, color: k, seed: 16 });
-      drawHand(c, { text: s.bottom, x: 560, y: sy(1160), size: 48 * T, rot: -3, color: k, seed: 17 });
+      const k = s.inkColor, T = (s.tsize || 100) / 100 * (s.modern ? 0.85 : 1);
+      const st = { color: k, hl: s.hlColor, hlStyle: s.hlCircle ? 'cerchio' : 'nastro',
+                   family: s.modern ? SANS : MARKER,
+                   weight: s.modern ? 500 : 400,
+                   jitter: !s.modern };
+      drawHand(c, { ...st, text: s.name, x: 780, y: sy(150), size: 76 * T, rot: -7, seed: 11 });
+      drawHand(c, { ...st, text: s.sub, x: 850, y: sy(330), size: 40 * T, rot: -5, seed: 12 });
+      drawHand(c, { ...st, text: s.leftTop, x: 215, y: sy(230), size: 36 * T, rot: -8, seed: 13 });
+      drawHand(c, { ...st, text: s.leftList, x: 55, y: sy(750), size: 40 * T, rot: -2, align: 'left', lh: 1.55, seed: 14 });
+      drawHand(c, { ...st, text: s.rightPlus, x: 670, y: sy(500), size: 38 * T, rot: -4, align: 'left', lh: 1.5, seed: 15 });
+      drawHand(c, { ...st, text: s.rightQuote, x: 880, y: sy(950), size: 40 * T, rot: -11, seed: 16 });
+      drawHand(c, { ...st, text: s.bottom, x: 560, y: sy(1160), size: 48 * T, rot: -3, seed: 17 });
       if (s.leftTop.trim()) drawArrow(c, 250, sy(330), 330, sy(450), -40, k);
       if (s.name.trim()) drawArrow(c, 640, sy(210), 545, sy(320), 30, k);
       if (s.bottom.trim()) drawArrow(c, 420, sy(1130), 450, sy(1020), 35, k);
@@ -376,6 +499,8 @@ const TEMPLATES = [
       { key: 'subtitle', label: 'Sottotitolo a dx', type: 'text', def: 'A MOMENT CAPTURED ON THE FAST LANE' },
       { key: 'motion', label: 'Effetto mosso', type: 'range', def: 14, min: 0, max: 40 },
       { key: 'txtColor', label: 'Colore testo', type: 'swatch', def: '#f43334' },
+      { key: 'hlColor', label: 'Evidenziatore (*parola* nel testo)', type: 'swatch', def: '#fef6e2' },
+      { key: 'hlCircle', label: 'Evidenzia a cerchio (invece del nastro)', type: 'check', def: false },
       { key: 'showLogo', label: 'Logo spark in basso', type: 'check', def: false },
     ],
     draw(c, s, img) {
@@ -399,11 +524,12 @@ const TEMPLATES = [
       letterSpace(c, 1.5 * T);
       setFont(c, 700, 26 * T, SANS);
       const credit = s.credit.toUpperCase().split('\n');
-      credit.forEach((l, i) => c.fillText(l, 160, sy(640) + i * 34 * T));
-      c.fillText(s.title.toUpperCase(), 590, sy(640));
+      const hst = s.hlCircle ? 'cerchio' : 'nastro';
+      credit.forEach((l, i) => drawMarkedLine(c, l, 160, sy(640) + i * 34 * T, 26 * T, s.hlColor, 'left', 'alphabetic', hst));
+      drawMarkedLine(c, s.title.toUpperCase(), 590, sy(640), 26 * T, s.hlColor, 'left', 'alphabetic', hst);
       setFont(c, 500, 26 * T, SANS);
       const sub = wrapLines(c, s.subtitle.toUpperCase(), 400);
-      sub.forEach((l, i) => c.fillText(l.join(' '), 590, sy(640) + (i + 1) * 34 * T));
+      sub.forEach((l, i) => drawMarkedLine(c, l.join(' '), 590, sy(640) + (i + 1) * 34 * T, 26 * T, s.hlColor, 'left', 'alphabetic', hst));
       letterSpace(c, 0);
       c.restore();
       if (s.showLogo) drawLogo(c, W / 2, H - 80, 60, s.txtColor);
@@ -429,6 +555,8 @@ const TEMPLATES = [
       { key: 'signW', label: 'Larghezza cartello', type: 'range', def: 460, min: 240, max: 820 },
       { key: 'signRot', label: 'Rotazione', type: 'range', def: -2, min: -15, max: 15 },
       { key: 'inkColor', label: 'Colore marker', type: 'swatch', def: '#f43334' },
+      { key: 'hlColor', label: 'Evidenziatore (*parola* nel testo)', type: 'swatch', def: '#fef6e2' },
+      { key: 'hlCircle', label: 'Evidenzia a cerchio (invece del nastro)', type: 'check', def: false },
       { key: 'showLogo', label: 'Logo spark sul cartello', type: 'check', def: false },
     ],
     draw(c, s, img) {
@@ -437,7 +565,7 @@ const TEMPLATES = [
       const lines = s.signText.split('\n').filter(l => l.trim());
       const pad = 34;
       let size = 64 * (s.tsize || 100) / 100;
-      for (const l of lines) size = Math.min(size, fitSize(c, l, size, s.signW - pad * 2, 400, "'Permanent Marker'"));
+      for (const l of lines) size = Math.min(size, fitSize(c, stripMarks(l), size, s.signW - pad * 2, 400, "'Permanent Marker'"));
       const lh = size * 1.28;
       const signH = lines.length * lh + pad * 2 + (s.showLogo ? size * 0.9 : 0);
       c.save();
@@ -456,7 +584,7 @@ const TEMPLATES = [
       c.textBaseline = 'middle';
       setFont(c, 400, size, "'Permanent Marker'");
       const top = -signH / 2 + pad + lh / 2;
-      lines.forEach((l, i) => c.fillText(l, 0, top + i * lh));
+      lines.forEach((l, i) => drawMarkedLine(c, l, 0, top + i * lh, size, s.hlColor, 'center', 'middle', s.hlCircle ? 'cerchio' : 'nastro'));
       if (s.showLogo) drawLogo(c, 0, top + lines.length * lh + size * 0.25, size * 0.8, s.inkColor);
       c.restore();
       drawGrain(c, 0.05);
@@ -474,6 +602,8 @@ const TEMPLATES = [
       { key: 'bgColor', label: 'Sfondo', type: 'swatch', def: '#0B3042' },
       { key: 'caption', label: 'Caption (opzionale)', type: 'text', def: '' },
       { key: 'capColor', label: 'Colore caption', type: 'swatch', def: '#fef6e2' },
+      { key: 'hlColor', label: 'Evidenziatore (*parola* nella caption)', type: 'swatch', def: '#ee6a2d' },
+      { key: 'hlCircle', label: 'Evidenzia a cerchio (invece del nastro)', type: 'check', def: false },
       { key: 'cutSize', label: 'Dimensione soggetto', type: 'range', def: 100, min: 40, max: 180 },
       { key: 'showLogo', label: 'Logo spark in basso', type: 'check', def: true },
     ],
@@ -503,7 +633,7 @@ const TEMPLATES = [
         c.restore();
       }
       if (s.caption.trim()) {
-        drawHand(c, { text: s.caption, x: 540, y: H - 180, size: 52 * (s.tsize || 100) / 100, rot: -2, color: s.capColor, seed: 21 });
+        drawHand(c, { text: s.caption, x: 540, y: H - 180, size: 52 * (s.tsize || 100) / 100, rot: -2, color: s.capColor, hl: s.hlColor, hlStyle: s.hlCircle ? 'cerchio' : 'nastro', seed: 21 });
       }
       if (s.showLogo) drawLogo(c, W / 2, H - 78, 66, s.capColor);
       drawGrain(c, 0.06);
@@ -519,6 +649,8 @@ const TEMPLATES = [
       { key: 'headline', label: 'Headline', type: 'textarea', def: 'Because growth starts when someone feels your brand belongs.' },
       { key: 'blur', label: 'Sfocatura foto', type: 'range', def: 14, min: 0, max: 40 },
       { key: 'txtColor', label: 'Colore testo', type: 'swatch', def: '#f43334' },
+      { key: 'hlColor', label: 'Evidenziatore (*parola* nel testo)', type: 'swatch', def: '#fef6e2' },
+      { key: 'hlCircle', label: 'Evidenzia a cerchio (invece del nastro)', type: 'check', def: false },
       { key: 'size', label: 'Corpo testo', type: 'range', def: 64, min: 40, max: 90 },
       { key: 'showLogo', label: 'Logo spark in basso', type: 'check', def: true },
     ],
@@ -530,12 +662,13 @@ const TEMPLATES = [
       const size = s.size * (s.tsize || 100) / 100;
       setFont(c, 500, size, SANS);
       letterSpace(c, 2);
-      const lines = wrapLines(c, s.headline.toUpperCase(), 900).length;
+      const lines = wrapLines(c, stripMarks(s.headline).toUpperCase(), 900).length;
       letterSpace(c, 0);
       const blockH = lines * size * 1.18;
       drawJustified(c, {
         text: s.headline, x: 90, y: (H - blockH) / 2 + size * 0.55, width: 900,
-        size, color: s.txtColor, lh: 1.18, weight: 500, ls: 2
+        size, color: s.txtColor, lh: 1.18, weight: 500, ls: 2, hl: s.hlColor,
+        hlStyle: s.hlCircle ? 'cerchio' : 'nastro'
       });
       if (s.showLogo) drawLogo(c, W / 2, H - 110, 64, s.txtColor);
       drawGrain(c, 0.05);
@@ -551,6 +684,8 @@ const TEMPLATES = [
       { key: 'headline', label: 'Headline', type: 'textarea', def: "You're not stuck because of what you did. You're stuck because you won't deal with it." },
       { key: 'cardColor', label: 'Colore card', type: 'swatch', def: '#518fa6' },
       { key: 'txtColor', label: 'Colore testo', type: 'swatch', def: '#fef6e2' },
+      { key: 'hlColor', label: 'Evidenziatore (*parola* nel testo)', type: 'swatch', def: '#ee6a2d' },
+      { key: 'hlCircle', label: 'Evidenzia a cerchio (invece del nastro)', type: 'check', def: false },
       { key: 'cardW', label: 'Larghezza card', type: 'range', def: 620, min: 400, max: 900 },
       { key: 'cardH', label: 'Altezza card', type: 'range', def: 780, min: 400, max: 1600 },
       { key: 'showLogo', label: 'Logo spark sulla card', type: 'check', def: true },
@@ -574,12 +709,13 @@ const TEMPLATES = [
       const size = 46 * (s.tsize || 100) / 100;
       setFont(c, 500, size, SANS);
       letterSpace(c, 1.5);
-      const nLines = wrapLines(c, s.headline.toUpperCase(), 900).length;
+      const nLines = wrapLines(c, stripMarks(s.headline).toUpperCase(), 900).length;
       letterSpace(c, 0);
       const blockH = nLines * size * 1.5;
       drawJustified(c, {
         text: s.headline, x: 90, y: cy - blockH / 2 + size * 0.8, width: 900,
-        size, color: s.txtColor, lh: 1.5, weight: 500, ls: 1.5
+        size, color: s.txtColor, lh: 1.5, weight: 500, ls: 1.5, hl: s.hlColor,
+        hlStyle: s.hlCircle ? 'cerchio' : 'nastro'
       });
       if (s.showLogo) drawLogo(c, cx, cy + s.cardH / 2 - 70, 56, s.txtColor);
       drawGrain(c, 0.04);
@@ -595,6 +731,9 @@ const TEMPLATES = [
       { key: 'bigWords', label: 'Parole grandi (separa con spazi)', type: 'text', def: 'GO WITH THE FLOW' },
       { key: 'centerText', label: 'Testo centrale serif', type: 'textarea', def: 'Stop living limited.\nStart building leverage.' },
       { key: 'wordColor', label: 'Colore parole', type: 'swatch', def: '#fef6e2' },
+      { key: 'modern', label: 'Font moderno (Helvetica, niente corsivo)', type: 'check', def: false },
+      { key: 'hlColor', label: 'Evidenziatore (*parola* nel testo)', type: 'swatch', def: '#ee6a2d' },
+      { key: 'hlCircle', label: 'Evidenzia a cerchio (invece del nastro)', type: 'check', def: false },
       { key: 'seed', label: 'Disposizione (mescola)', type: 'range', def: 3, min: 1, max: 30 },
       { key: 'showLogo', label: 'Logo spark in basso', type: 'check', def: true },
     ],
@@ -609,15 +748,20 @@ const TEMPLATES = [
       ];
       const rnd = mulberry32(s.seed * 97 + 13);
       const T = (s.tsize || 100) / 100;
+      const fam = s.modern ? SANS : SCRIPT;
+      const wgt = s.modern ? 700 : 400;
+      const base = s.modern ? 130 : 280;
       words.forEach((w, i) => {
         const [ax, ay] = anchors[i % anchors.length];
-        const size = fitSize(c, w, (280 - rnd() * 40) * T, 480, 400, SCRIPT);
+        const word = s.modern ? w.toUpperCase() : w;
+        const size = fitSize(c, stripMarks(word), (base - rnd() * (base * 0.15)) * T, 480, wgt, fam);
         drawHand(c, {
-          text: w,
+          text: word,
           x: ax + (rnd() - 0.5) * 60,
           y: sy(ay) + (rnd() - 0.5) * 50,
-          size, rot: (rnd() - 0.5) * 24,
-          color: s.wordColor, family: SCRIPT, seed: s.seed + i
+          size, rot: (rnd() - 0.5) * (s.modern ? 10 : 24),
+          color: s.wordColor, family: fam, weight: wgt,
+          jitter: !s.modern, hl: s.hlColor, hlStyle: s.hlCircle ? 'cerchio' : 'nastro', seed: s.seed + i
         });
       });
       if (s.centerText.trim()) {
@@ -627,9 +771,9 @@ const TEMPLATES = [
         c.textBaseline = 'middle';
         c.shadowColor = 'rgba(0,0,0,0.5)';
         c.shadowBlur = 16;
-        setFont(c, 400, 46 * T, SERIF);
+        setFont(c, 400, 46 * T, s.modern ? SANS : SERIF);
         const lines = s.centerText.split('\n');
-        lines.forEach((l, i) => c.fillText(l, 620, sy(700) + i * 62 * T));
+        lines.forEach((l, i) => drawMarkedLine(c, l, 620, sy(700) + i * 62 * T, 46 * T, s.hlColor, 'center', 'middle', s.hlCircle ? 'cerchio' : 'nastro'));
         c.restore();
       }
       if (s.showLogo) drawLogo(c, W / 2, H - 75, 60, s.wordColor);

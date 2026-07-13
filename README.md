@@ -37,6 +37,16 @@ Doppio click su **`start.command`** (avvia un server locale su `localhost:8420` 
 - Parole sparse calligrafiche: **Zeyada**
 - Statement / card / blur B&N: **Helvetica Neue** (di sistema)
 - Testo centrale serif: **EB Garamond**
+- **Varianti "Font moderno"**: Selfie annotato e Parole sparse hanno un checkbox che passa le scritte a Helvetica (pulito, senza jitter), stile poster contemporaneo.
+
+## Evidenziatore
+
+Racchiudi le parole tra asterischi nei campi testo — `il *growth engine* nella tua voce` — e vengono evidenziate. Due stili (checkbox per template):
+
+- **Nastro** (default): strisce marker piene con sbordi irregolari, stile poster Semi Permanent.
+- **Cerchio**: ellisse a penna sketchy, doppio giro, come cerchiato a mano.
+
+Il colore si sceglie dagli swatch brand ("Evidenziatore"). Funziona su tutti i template, incluso il testo giustificato (parole consecutive evidenziate diventano un'unica banda/cerchio).
 
 ## Note
 
