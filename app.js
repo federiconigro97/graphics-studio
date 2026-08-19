@@ -14,7 +14,7 @@ function setFormat(f) {
   H = f === '9:16' ? 1920 : 1350;
   canvas.height = H;
   canvas.style.aspectRatio = f === '9:16' ? '9 / 16' : '4 / 5';
-  document.getElementById('exportBtn').textContent = `Scarica PNG (${W}×${H})`;
+  updateExportBtn();
   buildAdjust();
   render();
 }
@@ -275,6 +275,76 @@ function drawArrow(c, x1, y1, x2, y2, curve, color, lw = 7) {
   c.lineTo(x2 - hl * Math.cos(ang + 0.45), y2 - hl * Math.sin(ang + 0.45));
   c.stroke();
   c.restore();
+}
+
+/* chevron (arrowhead) pointing along tangent angle a */
+function drawChevron(c, px, py, a, color, lw, size) {
+  c.save();
+  c.strokeStyle = color;
+  c.lineWidth = lw;
+  c.lineCap = 'round';
+  c.lineJoin = 'round';
+  c.beginPath();
+  c.moveTo(px - size * Math.cos(a - 0.5), py - size * Math.sin(a - 0.5));
+  c.lineTo(px, py);
+  c.lineTo(px - size * Math.cos(a + 0.5), py - size * Math.sin(a + 0.5));
+  c.stroke();
+  c.restore();
+}
+
+/* cyclic ring: two arcs with a gap top & bottom, clockwise arrowheads in the gaps */
+function drawCycleRing(c, cx, cy, R, color, lw) {
+  const g = 0.16;
+  c.save();
+  c.strokeStyle = color;
+  c.lineWidth = lw;
+  c.lineCap = 'round';
+  c.beginPath(); c.arc(cx, cy, R, -Math.PI / 2 + g, Math.PI / 2 - g); c.stroke();
+  c.beginPath(); c.arc(cx, cy, R, Math.PI / 2 + g, Math.PI * 1.5 - g); c.stroke();
+  c.restore();
+  // top gap → arrowhead pointing clockwise (tangent = θ + 90°, at θ=-90° → a=0)
+  drawChevron(c, cx + R * Math.cos(-Math.PI / 2 + g * 0.4), cy + R * Math.sin(-Math.PI / 2 + g * 0.4), 0, color, lw, R * 0.07);
+  // bottom gap → arrowhead pointing counter-clockwise back (θ=90° → a=π)
+  drawChevron(c, cx + R * Math.cos(Math.PI / 2 - g * 0.4), cy + R * Math.sin(Math.PI / 2 - g * 0.4), Math.PI, color, lw, R * 0.07);
+}
+
+/* dark legibility gradient for photo-backed story frames */
+function storyOverlay(c, tint) {
+  const t = (tint ?? 55) / 100;
+  c.save();
+  const g = c.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, `rgba(8,10,12,${0.20 + 0.30 * t})`);
+  g.addColorStop(0.45, `rgba(8,10,12,${0.10 * t})`);
+  g.addColorStop(1, `rgba(8,10,12,${0.35 + 0.35 * t})`);
+  c.fillStyle = g;
+  c.fillRect(0, 0, W, H);
+  c.restore();
+}
+
+/* wrap honouring manual \n line breaks, returns array of strings */
+function wrapKeepBreaks(c, text, maxW) {
+  const out = [];
+  (text || '').split('\n').forEach(part => {
+    if (!part.trim()) { out.push(''); return; }
+    wrapLines(c, part, maxW).forEach(ln => out.push(ln.join(' ')));
+  });
+  return out;
+}
+
+/* like wrapKeepBreaks but preserves *marks*, wrapping on the stripped width */
+function wrapMarked(c, text, maxW) {
+  const out = [];
+  (text || '').split('\n').forEach(part => {
+    if (!part.trim()) { out.push(''); return; }
+    let line = [];
+    part.split(/\s+/).filter(Boolean).forEach(w => {
+      const test = [...line, w].join(' ');
+      if (line.length && c.measureText(stripMarks(test)).width > maxW) { out.push(line.join(' ')); line = [w]; }
+      else line.push(w);
+    });
+    if (line.length) out.push(line.join(' '));
+  });
+  return out;
 }
 
 /* film grain overlay */
@@ -781,6 +851,211 @@ const TEMPLATES = [
       drawGrain(c, 0.06);
     }
   },
+
+  /* ===== STORIE (9:16) ===== */
+
+  {
+    id: 'story-series',
+    name: 'Storie in serie',
+    hint: 'incolla il testo → si divide in frame',
+    series: true,
+    defaultFormat: '9:16',
+    defaultPhoto: 'assets/photo-park.jpg',
+    fields: [
+      { key: 'title', scope: 'frame', label: 'Titolo del frame', type: 'textarea', def: 'Titolo del frame' },
+      { key: 'body', scope: 'frame', label: 'Testo del frame', type: 'textarea', def: 'Testo del frame.\n- punto uno\n- punto due' },
+      { key: 'cover', scope: 'frame', label: 'Frame cover (titolo centrato, senza numero)', type: 'check', def: false },
+      { key: 'accent', scope: 'series', label: 'Colore testo', type: 'swatch', def: '#fef6e2' },
+      { key: 'hlColor', scope: 'series', label: 'Evidenziatore keyword (*parola* nel testo)', type: 'swatch', def: '#ee6a2d' },
+      { key: 'hlCircle', scope: 'series', label: 'Evidenzia a cerchio (invece del nastro)', type: 'check', def: false },
+      { key: 'textY', scope: 'series', label: 'Posizione testo racconto ↕ (0 alto, 100 basso)', type: 'range', def: 50, min: 15, max: 85 },
+      { key: 'autonumber', scope: 'series', label: 'Numera gli step (1. 2. 3.)', type: 'check', def: true },
+      { key: 'dots', scope: 'series', label: 'Puntini di avanzamento', type: 'check', def: true },
+      { key: 'tint', scope: 'series', label: 'Scurisci foto (leggibilità)', type: 'range', def: 55, min: 0, max: 100 },
+      { key: 'showLogo', scope: 'series', label: 'Logo spark in basso', type: 'check', def: true },
+    ],
+    draw(c, f, img, S) {
+      coverDraw(c, img, f.zoom, f.ox, f.oy);
+      storyOverlay(c, S.tint);
+      const T = (S.tsize || 100) / 100;
+      const acc = S.accent;
+      const idx = S.frames.indexOf(f);
+      if (S.prose && !f.cover) {
+        c.save(); c.fillStyle = 'rgba(8,10,12,0.32)'; c.fillRect(0, 0, W, H); c.restore();
+        const txt = [f.title, f.body].filter(x => x && x.trim()).join('\n');
+        c.save();
+        c.fillStyle = acc; c.textAlign = 'left'; c.textBaseline = 'alphabetic';
+        const size = 45 * T;
+        setFont(c, 500, size, SANS);
+        const lines = wrapMarked(c, txt, 912);
+        const lh = size * 1.5;
+        const y = H * (S.textY ?? 50) / 100 - (lines.length - 1) * lh / 2;
+        const hst = S.hlCircle ? 'cerchio' : 'nastro';
+        lines.forEach((ln, i) => drawMarkedLine(c, ln, 84, y + i * lh, size, S.hlColor, 'left', 'alphabetic', hst));
+        c.restore();
+      } else if (f.cover) {
+        c.save();
+        c.fillStyle = acc; c.textAlign = 'center'; c.textBaseline = 'middle';
+        let hs = 82 * T; hs = fitSize(c, (f.title || '').split('\n')[0], hs, 880, 700, SANS);
+        setFont(c, 700, hs, SANS);
+        const lines = wrapKeepBreaks(c, f.title, 880);
+        const lh = hs * 1.14;
+        let y0 = H * 0.44 - (lines.length - 1) * lh / 2;
+        lines.forEach((ln, i) => c.fillText(ln, W / 2, y0 + i * lh));
+        if ((f.body || '').trim()) {
+          setFont(c, 500, 30 * T, SANS);
+          c.fillStyle = acc; c.globalAlpha = 0.82;
+          const bl = wrapKeepBreaks(c, f.body, 760);
+          bl.forEach((ln, i) => c.fillText(ln, W / 2, y0 + lines.length * lh + 30 + i * 44 * T));
+        }
+        c.restore();
+      } else {
+        let num = 0; for (let i = 0; i <= idx; i++) if (!S.frames[i].cover) num++;
+        const x = 84; let y = H * 0.24;
+        c.save();
+        c.textAlign = 'left'; c.textBaseline = 'alphabetic';
+        const heading = (S.autonumber ? num + '. ' : '') + (f.title || '');
+        let hs = 62 * T; hs = fitSize(c, heading, hs, 912, 700, SANS);
+        setFont(c, 700, hs, SANS);
+        c.fillStyle = acc;
+        const hlines = wrapKeepBreaks(c, heading, 912);
+        hlines.forEach((ln, i) => c.fillText(ln, x, y + i * hs * 1.16));
+        y += hlines.length * hs * 1.16 + hs * 0.5;
+        setFont(c, 500, 33 * T, SANS);
+        c.fillStyle = acc; c.globalAlpha = 0.92;
+        (f.body || '').split('\n').forEach(p => {
+          if (!p.trim()) { y += 24 * T; return; }
+          const bullet = /^\s*[-•]/.test(p);
+          const txt = p.replace(/^\s*[-•]\s*/, '');
+          const wl = wrapLines(c, txt, bullet ? 828 : 912);
+          wl.forEach((ln, i) => {
+            const tx = bullet ? x + 40 : x;
+            if (bullet && i === 0) c.fillText('•', x, y);
+            c.fillText(ln.join(' '), tx, y);
+            y += 46 * T;
+          });
+        });
+        c.restore();
+      }
+      if (S.dots && S.frames.length > 1) {
+        const n = S.frames.length, gap = 26, r = 5, tot = (n - 1) * gap, sx = W / 2 - tot / 2, dy = H - 96;
+        for (let i = 0; i < n; i++) {
+          c.beginPath(); c.arc(sx + i * gap, dy, r, 0, 6.283);
+          c.fillStyle = i === idx ? acc : 'rgba(254,246,226,0.35)';
+          c.fill();
+        }
+      }
+      if (S.showLogo) drawLogo(c, W / 2, H - 150, 54, acc);
+      drawGrain(c, 0.05);
+    }
+  },
+
+  {
+    id: 'story-cover',
+    name: 'Cover storia',
+    hint: 'titolo grande + occhiello + pill',
+    defaultFormat: '9:16',
+    defaultPhoto: 'assets/photo-cafe.jpg',
+    fields: [
+      { key: 'headline', label: 'Titolo (grande, in basso)', type: 'textarea', def: 'COS’È IL\nGROWTH\nENGINE?' },
+      { key: 'body', label: 'Occhiello (piccolo, in alto a dx)', type: 'textarea', def: 'Un motore di content e outbound che gira ogni giorno nella tua voce, senza presidiarlo a mano.' },
+      { key: 'cta', label: 'Pill in basso (vuoto = niente)', type: 'text', def: 'SCOPRI DI PIÙ' },
+      { key: 'brand', label: 'Parola brand (vicino al logo)', type: 'text', def: 'data spark' },
+      { key: 'accent', label: 'Colore testo', type: 'swatch', def: '#fef6e2' },
+      { key: 'tint', label: 'Scurisci foto', type: 'range', def: 45, min: 0, max: 100 },
+      { key: 'showLogo', label: 'Logo spark in alto a dx', type: 'check', def: true },
+    ],
+    draw(c, s, img) {
+      coverDraw(c, img, s.zoom, s.ox, s.oy);
+      storyOverlay(c, s.tint);
+      const T = (s.tsize || 100) / 100, acc = s.accent;
+      // occhiello in alto a dx
+      c.save();
+      c.textAlign = 'left'; c.textBaseline = 'alphabetic';
+      c.fillStyle = acc;
+      setFont(c, 500, 31 * T, SANS);
+      const bl = wrapKeepBreaks(c, s.body, 440);
+      bl.forEach((ln, i) => c.fillText(ln, 560, H * 0.34 + i * 42 * T));
+      // titolo grande in basso a sx
+      let hs = 96 * T; hs = fitSize(c, s.headline.split('\n')[0].toUpperCase(), hs, 640, 800, SANS);
+      setFont(c, 800, hs, SANS);
+      const hlines = wrapKeepBreaks(c, s.headline.toUpperCase(), 640);
+      const lh = hs * 1.02;
+      let hy = H * 0.72 - (hlines.length - 1) * lh;
+      hlines.forEach((ln, i) => c.fillText(ln, 72, hy + i * lh));
+      c.restore();
+      // logo + brand in alto a dx
+      if (s.showLogo) {
+        drawLogo(c, W - 96, 116, 66, acc);
+        if ((s.brand || '').trim()) {
+          c.save();
+          c.fillStyle = acc; c.textAlign = 'right'; c.textBaseline = 'middle';
+          setFont(c, 600, 30 * T, SANS);
+          c.fillText(s.brand, W - 150, 116);
+          c.restore();
+        }
+      }
+      // pill CTA in basso
+      if ((s.cta || '').trim()) {
+        c.save();
+        c.textAlign = 'center'; c.textBaseline = 'middle';
+        setFont(c, 600, 30 * T, SANS);
+        letterSpace(c, 2);
+        const tw = c.measureText(s.cta.toUpperCase()).width;
+        const pw = tw + 96, ph = 84 * T, px = W / 2 - pw / 2, py = H * 0.90 - ph / 2;
+        c.fillStyle = 'rgba(15,18,20,0.55)';
+        c.beginPath(); c.roundRect(px, py, pw, ph, ph / 2); c.fill();
+        c.lineWidth = 2; c.strokeStyle = acc; c.globalAlpha = 0.85; c.stroke();
+        c.globalAlpha = 1; c.fillStyle = acc;
+        c.fillText(s.cta.toUpperCase(), W / 2, H * 0.90 + 1);
+        letterSpace(c, 0);
+        c.restore();
+      }
+      drawGrain(c, 0.05);
+    }
+  },
+
+  {
+    id: 'story-circle',
+    name: 'Cerchio / ciclo',
+    hint: '4 parole attorno a un cerchio',
+    defaultFormat: '9:16',
+    defaultPhoto: 'assets/photo-park.jpg',
+    fields: [
+      { key: 'top', label: 'Parola in alto', type: 'text', def: 'content' },
+      { key: 'right', label: 'Parola a destra', type: 'text', def: 'outbound' },
+      { key: 'bottom', label: 'Parola in basso', type: 'text', def: 'sistema' },
+      { key: 'left', label: 'Parola a sinistra', type: 'text', def: 'crescita' },
+      { key: 'accent', label: 'Colore cerchio e testo', type: 'swatch', def: '#fef6e2' },
+      { key: 'ring', label: 'Dimensione cerchio', type: 'range', def: 30, min: 18, max: 42 },
+      { key: 'cy', label: 'Posizione verticale', type: 'range', def: 46, min: 25, max: 70 },
+      { key: 'tint', label: 'Scurisci foto', type: 'range', def: 30, min: 0, max: 100 },
+      { key: 'showLogo', label: 'Logo spark in basso', type: 'check', def: false },
+    ],
+    draw(c, s, img) {
+      coverDraw(c, img, s.zoom, s.ox, s.oy);
+      storyOverlay(c, s.tint);
+      const T = (s.tsize || 100) / 100, acc = s.accent;
+      const cx = W / 2, cy = H * (s.cy / 100), R = W * (s.ring / 100);
+      drawCycleRing(c, cx, cy, R, acc, Math.max(2.5, W * 0.0035));
+      c.save();
+      c.fillStyle = acc;
+      c.textBaseline = 'middle';
+      const pad = 34, m = 40, base = 46 * T;
+      const put = (txt, x, y, align, avail) => {
+        c.textAlign = align;
+        setFont(c, 500, fitSize(c, txt, base, avail, 500, SANS), SANS);
+        c.fillText(txt, x, y);
+      };
+      put(s.top, cx, cy - R - pad, 'center', W - 2 * m);
+      put(s.bottom, cx, cy + R + pad, 'center', W - 2 * m);
+      put(s.left, cx - R - pad, cy, 'right', cx - R - pad - m);
+      put(s.right, cx + R + pad, cy, 'left', W - m - (cx + R + pad));
+      c.restore();
+      if (s.showLogo) drawLogo(c, W / 2, H - 130, 54, acc);
+      drawGrain(c, 0.05);
+    }
+  },
 ];
 
 /* ---------- photos ---------- */
@@ -803,14 +1078,81 @@ function loadImg(src) {
 
 /* ---------- state ---------- */
 const states = {};
+
+const SERIES_EXAMPLE =
+`Il growth engine nella tua voce
+
+---
+Definisci l'offerta
+Un solo problema, un solo cliente.
+Prima chiarezza, poi scala.
+
+---
+Costruisci il sistema
+Content + outbound che girano ogni giorno.
+- nella tua voce
+- senza presidiarlo a mano
+
+---
+Fai girare il motore
+Ogni giorno lo stesso ritmo.
+La costanza batte l'intensità.`;
+
+function makeFrame(tpl) {
+  const fr = { photo: tpl.defaultPhoto, zoom: 1, ox: 0, oy: 0 };
+  tpl.fields.filter(f => (f.scope || 'frame') === 'frame').forEach(f => fr[f.key] = f.def);
+  return fr;
+}
+
+function activeFrame(s) { return s.frames[s.active]; }
+
 function stateFor(tpl) {
   if (!states[tpl.id]) {
-    const s = { photo: tpl.defaultPhoto, zoom: 1, ox: 0, oy: 0, tsize: 100 };
-    tpl.fields.forEach(f => s[f.key] = f.def);
+    const s = { tsize: 100 };
+    if (tpl.series) {
+      tpl.fields.filter(f => f.scope === 'series').forEach(f => s[f.key] = f.def);
+      s.prose = false;
+      s.bulk = SERIES_EXAMPLE;
+      s.frames = [makeFrame(tpl)];
+      s.frames[0].cover = true;
+      s.frames[0].title = 'Il growth engine\nnella tua voce';
+      s.frames[0].body = '';
+      s.active = 0;
+    } else {
+      s.photo = tpl.defaultPhoto; s.zoom = 1; s.ox = 0; s.oy = 0;
+      tpl.fields.forEach(f => s[f.key] = f.def);
+    }
     states[tpl.id] = s;
   }
   return states[tpl.id];
 }
+
+/* incolla → frame. Separatore, in ordine: righe "Frame N" / "Slide N" → '---' → riga vuota.
+   1ª riga = titolo, resto = testo. `raw` = blocco intero (usato in modalità racconto). */
+const FRAME_MARKER = /^\s*(?:frame|slide|storia|story|scena|card)\s*\d+\s*[:.)\-]?\s*$/i;
+function splitBulk(text) {
+  let t = (text || '').replace(/\r/g, '').trim();
+  if (!t) return [];
+  let blocks;
+  if (t.split('\n').some(l => FRAME_MARKER.test(l))) {
+    blocks = []; let cur = [];
+    t.split('\n').forEach(l => {
+      if (FRAME_MARKER.test(l)) { if (cur.join('').trim()) blocks.push(cur.join('\n')); cur = []; }
+      else cur.push(l);
+    });
+    if (cur.join('').trim()) blocks.push(cur.join('\n'));
+  } else if (/\n\s*---\s*\n/.test(t)) {
+    blocks = t.split(/\n\s*---\s*\n/);
+  } else {
+    blocks = t.split(/\n\s*\n/);
+  }
+  return blocks.map(b => b.trim()).filter(Boolean).map(b => {
+    const lines = b.split('\n');
+    const title = lines.shift().replace(/^#+\s*/, '').replace(/^\d+[.)]\s*/, '').trim();
+    return { title, body: lines.join('\n').trim(), raw: b };
+  });
+}
+
 let current = TEMPLATES[0];
 
 /* ---------- render ---------- */
@@ -822,11 +1164,20 @@ function render() {
     renderPending = false;
     const s = stateFor(current);
     try {
-      const img = await loadImg(s.photo);
-      ctx.save();
-      ctx.clearRect(0, 0, W, H);
-      current.draw(ctx, s, img);
-      ctx.restore();
+      if (current.series) {
+        const fr = activeFrame(s);
+        const img = await loadImg(fr.photo);
+        ctx.save();
+        ctx.clearRect(0, 0, W, H);
+        current.draw(ctx, fr, img, s);
+        ctx.restore();
+      } else {
+        const img = await loadImg(s.photo);
+        ctx.save();
+        ctx.clearRect(0, 0, W, H);
+        current.draw(ctx, s, img);
+        ctx.restore();
+      }
     } catch (e) {
       ctx.fillStyle = '#26262a';
       ctx.fillRect(0, 0, W, H);
@@ -850,21 +1201,35 @@ function buildTemplates() {
     const b = document.createElement('button');
     b.innerHTML = `${t.name}<span>${t.hint}</span>`;
     b.className = t === current ? 'active' : '';
-    b.onclick = () => { current = t; buildAll(); render(); };
+    b.onclick = () => {
+      current = t;
+      if (t.defaultFormat && t.defaultFormat !== FORMAT) {
+        FORMAT = t.defaultFormat;
+        H = FORMAT === '9:16' ? 1920 : 1350;
+        canvas.height = H;
+        canvas.style.aspectRatio = FORMAT === '9:16' ? '9 / 16' : '4 / 5';
+      }
+      buildAll();
+      render();
+    };
     tplGrid.appendChild(b);
   });
 }
 
 let userPhotos = [];
+function photoTarget() {
+  const s = stateFor(current);
+  return current.series ? activeFrame(s) : s;
+}
 function buildPhotos() {
   photoGrid.innerHTML = '';
-  const s = stateFor(current);
+  const t = photoTarget();
   [...PRESET_PHOTOS, ...userPhotos].forEach(src => {
     const b = document.createElement('button');
-    b.className = 'ph' + (s.photo === src ? ' active' : '');
+    b.className = 'ph' + (t.photo === src ? ' active' : '');
     b.style.backgroundImage = `url("${src}")`;
     b.title = src.split('/').pop();
-    b.onclick = () => { s.photo = src; buildPhotos(); render(); };
+    b.onclick = () => { t.photo = src; buildPhotos(); render(); };
     photoGrid.appendChild(b);
   });
   const up = document.createElement('button');
@@ -880,7 +1245,7 @@ upload.onchange = () => {
   if (!f) return;
   const url = URL.createObjectURL(f);
   userPhotos.push(url);
-  stateFor(current).photo = url;
+  photoTarget().photo = url;
   buildPhotos();
   render();
   upload.value = '';
@@ -916,19 +1281,112 @@ function buildAdjust() {
     b.onclick = () => setFormat(f);
     fmtRow.appendChild(b);
   });
+  const adj = current.series ? activeFrame(s) : s;
   photoAdjust.append(
     fmtRow,
     sliderRow('Dimensione testi %', s.tsize, 60, 180, 1, v => s.tsize = v),
-    sliderRow('Zoom', s.zoom, 1, 3, 0.02, v => s.zoom = v),
-    sliderRow('Sposta ↔', s.ox, -60, 60, 1, v => s.ox = v),
-    sliderRow('Sposta ↕', s.oy, -60, 60, 1, v => s.oy = v),
+    sliderRow('Zoom', adj.zoom, 1, 3, 0.02, v => adj.zoom = v),
+    sliderRow('Sposta ↔', adj.ox, -60, 60, 1, v => adj.ox = v),
+    sliderRow('Sposta ↕', adj.oy, -60, 60, 1, v => adj.oy = v),
   );
+}
+
+function updateExportBtn() {
+  document.getElementById('exportBtn').textContent =
+    current.series ? 'Scarica tutte le storie (ZIP)' : `Scarica PNG (${W}×${H})`;
+}
+
+/* pannello serie: striscia dei frame + incolla/dividi */
+function buildSeriesPanel(s) {
+  const panel = document.createElement('div');
+  panel.style.marginBottom = '16px';
+
+  const head = document.createElement('label');
+  head.className = 'head';
+  head.style.cssText = 'display:block;font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:#8e8d8b;margin-bottom:8px;';
+  head.textContent = `Frame della serie (${s.frames.length})`;
+  panel.appendChild(head);
+
+  const strip = document.createElement('div');
+  strip.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;';
+  s.frames.forEach((fr, i) => {
+    const b = document.createElement('button');
+    b.textContent = fr.cover ? '★' : (i + 1);
+    b.title = fr.cover ? 'Cover' : `Frame ${i + 1}`;
+    b.style.cssText = `width:40px;height:40px;border-radius:8px;font-family:inherit;font-size:13px;cursor:pointer;border:1px solid ${i === s.active ? 'var(--orange)' : '#333'};background:${i === s.active ? '#2d2620' : '#26262a'};color:${i === s.active ? 'var(--cream)' : 'var(--mist)'};`;
+    b.onclick = () => { s.active = i; buildAll(); render(); };
+    strip.appendChild(b);
+  });
+  const add = document.createElement('button');
+  add.textContent = '+';
+  add.title = 'Aggiungi frame';
+  add.style.cssText = 'width:40px;height:40px;border-radius:8px;border:1px dashed #555;background:none;color:#8e8d8b;font-size:18px;cursor:pointer;';
+  add.onclick = () => { s.frames.push(makeFrame(current)); s.active = s.frames.length - 1; buildAll(); render(); };
+  strip.appendChild(add);
+  panel.appendChild(strip);
+
+  if (s.frames.length > 1) {
+    const del = document.createElement('button');
+    del.className = 'btn ghost';
+    del.textContent = `🗑 Elimina frame ${s.active + 1}`;
+    del.onclick = () => {
+      s.frames.splice(s.active, 1);
+      s.active = Math.min(s.active, s.frames.length - 1);
+      buildAll(); render();
+    };
+    panel.appendChild(del);
+  }
+
+  const bulkWrap = document.createElement('div');
+  bulkWrap.className = 'field';
+  const bulkLab = document.createElement('label');
+  bulkLab.innerHTML = 'Incolla tutto il testo qui, poi «Dividi»';
+  const bulk = document.createElement('textarea');
+  bulk.style.minHeight = '120px';
+  bulk.value = s.bulk || '';
+  bulk.oninput = () => { s.bulk = bulk.value; };
+  const hint = document.createElement('div');
+  hint.style.cssText = 'font-size:10px;color:#8e8d8b;margin:4px 0 8px;line-height:1.4;';
+  hint.textContent = 'Separa i frame con «Frame 1 / Frame 2…», una riga --- o una riga vuota. La 1ª riga di ogni blocco è il titolo, il resto è il testo. Le foto già scelte restano al loro posto.';
+  const proseLab = document.createElement('label');
+  proseLab.className = 'check';
+  const proseInp = document.createElement('input');
+  proseInp.type = 'checkbox';
+  proseInp.checked = !!s.prose;
+  proseInp.onchange = () => { s.prose = proseInp.checked; render(); };
+  proseLab.append(proseInp, document.createTextNode('Modalità racconto (testo scorrevole, niente titolo/numero)'));
+  const split = document.createElement('button');
+  split.className = 'btn ghost';
+  split.textContent = '✂️ Dividi in frame';
+  split.onclick = () => {
+    const parsed = splitBulk(s.bulk);
+    if (!parsed.length) return;
+    const old = s.frames;
+    s.frames = parsed.map((p, i) => {
+      const fr = makeFrame(current);
+      if (old[i]) { fr.photo = old[i].photo; fr.zoom = old[i].zoom; fr.ox = old[i].ox; fr.oy = old[i].oy; }
+      if (s.prose) { fr.title = ''; fr.body = p.raw; fr.cover = false; }
+      else { fr.title = p.title; fr.body = p.body; fr.cover = i === 0 && !p.body; }
+      return fr;
+    });
+    s.active = 0;
+    buildAll();
+    render();
+  };
+  bulkWrap.append(bulkLab, bulk, hint, proseLab, split);
+  panel.appendChild(bulkWrap);
+
+  const hr = document.createElement('hr');
+  panel.appendChild(hr);
+  fieldsEl.appendChild(panel);
 }
 
 function buildFields() {
   const s = stateFor(current);
   fieldsEl.innerHTML = '';
+  if (current.series) buildSeriesPanel(s);
   current.fields.forEach(f => {
+    const target = current.series ? (f.scope === 'series' ? s : activeFrame(s)) : s;
     if (f.type === 'text' || f.type === 'textarea') {
       const wrap = document.createElement('div');
       wrap.className = 'field';
@@ -936,12 +1394,12 @@ function buildFields() {
       lab.textContent = f.label;
       const inp = document.createElement(f.type === 'text' ? 'input' : 'textarea');
       if (f.type === 'text') inp.type = 'text';
-      inp.value = s[f.key];
-      inp.oninput = () => { s[f.key] = inp.value; render(); };
+      inp.value = target[f.key];
+      inp.oninput = () => { target[f.key] = inp.value; render(); };
       wrap.append(lab, inp);
       fieldsEl.appendChild(wrap);
     } else if (f.type === 'range') {
-      fieldsEl.appendChild(sliderRow(f.label, s[f.key], f.min, f.max, 1, v => s[f.key] = v));
+      fieldsEl.appendChild(sliderRow(f.label, target[f.key], f.min, f.max, 1, v => target[f.key] = v));
     } else if (f.type === 'swatch') {
       const wrap = document.createElement('div');
       wrap.className = 'field';
@@ -953,9 +1411,9 @@ function buildFields() {
         const b = document.createElement('button');
         b.style.background = col;
         b.title = col;
-        if (s[f.key].toLowerCase() === col.toLowerCase()) b.className = 'active';
+        if (target[f.key].toLowerCase() === col.toLowerCase()) b.className = 'active';
         b.onclick = () => {
-          s[f.key] = col;
+          target[f.key] = col;
           sw.querySelectorAll('button').forEach(x => x.className = '');
           b.className = 'active';
           render();
@@ -998,8 +1456,8 @@ function buildFields() {
       lab.className = 'check';
       const inp = document.createElement('input');
       inp.type = 'checkbox';
-      inp.checked = s[f.key];
-      inp.onchange = () => { s[f.key] = inp.checked; render(); };
+      inp.checked = target[f.key];
+      inp.onchange = () => { target[f.key] = inp.checked; render(); };
       lab.append(inp, document.createTextNode(f.label));
       fieldsEl.appendChild(lab);
     }
@@ -1011,15 +1469,59 @@ function buildAll() {
   buildPhotos();
   buildAdjust();
   buildFields();
+  updateExportBtn();
 }
 
 /* ---------- export ---------- */
-document.getElementById('exportBtn').onclick = () => {
+function exportSingle() {
   const a = document.createElement('a');
   a.download = `dataspark-${current.id}-${FORMAT.replace(':', 'x')}-${new Date().toISOString().slice(0, 10)}.png`;
   a.href = canvas.toDataURL('image/png');
   a.click();
-};
+}
+
+async function exportSeries() {
+  const btn = document.getElementById('exportBtn');
+  const label = btn.textContent;
+  const s = stateFor(current);
+  const date = new Date().toISOString().slice(0, 10);
+  const shots = [];
+  for (let i = 0; i < s.frames.length; i++) {
+    btn.textContent = `Preparo storia ${i + 1}/${s.frames.length}…`;
+    const fr = s.frames[i];
+    let img;
+    try { img = await loadImg(fr.photo); } catch (e) { continue; }
+    ctx.clearRect(0, 0, W, H);
+    ctx.save();
+    current.draw(ctx, fr, img, s);
+    ctx.restore();
+    shots.push({ name: `storia-${String(i + 1).padStart(2, '0')}.png`, data: canvas.toDataURL('image/png') });
+  }
+  try {
+    const { default: JSZip } = await import('https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm');
+    const zip = new JSZip();
+    shots.forEach(sh => zip.file(sh.name, sh.data.split(',')[1], { base64: true }));
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const a = document.createElement('a');
+    a.download = `dataspark-storie-${date}.zip`;
+    a.href = URL.createObjectURL(blob);
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  } catch (e) {
+    // fallback offline: download singoli scaglionati
+    for (const sh of shots) {
+      const a = document.createElement('a');
+      a.download = `dataspark-${date}-${sh.name}`;
+      a.href = sh.data;
+      a.click();
+      await new Promise(r => setTimeout(r, 400));
+    }
+  }
+  btn.textContent = label;
+  render();
+}
+
+document.getElementById('exportBtn').onclick = () => current.series ? exportSeries() : exportSingle();
 
 /* ---------- boot ---------- */
 buildAll();

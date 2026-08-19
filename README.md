@@ -14,7 +14,9 @@ Doppio click su **`start.command`** (avvia un server locale su `localhost:8420` 
 4. Cambia il **copy** nei campi. I colori si scelgono solo dagli swatch brand.
 5. **Scarica PNG** → 1080×1350 (formato feed LinkedIn/IG).
 
-## I 7 template → reference
+## I template → reference
+
+**Feed (4:5)**
 
 | Template | Reference |
 |---|---|
@@ -25,6 +27,24 @@ Doppio click su **`start.command`** (avvia un server locale su `localhost:8420` 
 | Statement su blur | "Because growth starts…" rosso giustificato |
 | Card colorata | rettangolo blu + testo bianco giustificato |
 | Parole sparse | "Go with the flow" + serif centrale |
+
+**Storie (9:16)** — si aprono già in formato story
+
+| Template | Reference | Cosa fa |
+|---|---|---|
+| Storie in serie | carosello numerato PROJECT50 (1. Make a plan, 2. Gear up…) | incolli tutto il testo → si divide in frame, ogni frame con foto sua |
+| Cover storia | "WHAT IS CIRCLE21 CLUBS?" (titolo grande + occhiello + pill) | copertina di una serie |
+| Cerchio / ciclo | 4 parole attorno a un cerchio con frecce (discipline/routine…) | schema a ciclo sopra la foto |
+
+### Storie in serie (autopilot)
+
+1. Scegli il template **Storie in serie** (passa da solo a 9:16).
+2. Incolla tutto il copy nel box grande, un blocco per frame. **Separatori riconosciuti** (in ordine): righe tipo `Frame 1` / `Slide 2` / `Storia 3`, oppure una riga `---`, oppure una riga vuota. La **1ª riga di ogni blocco è il titolo**, il resto è il testo (le righe che iniziano con `-` diventano bullet).
+3. **Modalità racconto** (checkbox sopra «Dividi»): per contenuti di prosa/persuasione dove ogni frame è un paragrafo scorrevole senza titolo né numero. Con la spunta il testo diventa un blocco unico centrato sopra la foto, con più scrim per leggibilità. Senza spunta → layout listicle (titolo grande + numero + bullet, stile PROJECT50).
+4. Premi **✂️ Dividi in frame**: crea un frame per blocco. In modalità listicle il primo blocco senza corpo diventa **cover** (titolo centrato, senza numero); gli altri sono step numerati (1. 2. 3.).
+5. Nella **striscia dei frame** (★ 1 2 3 …) clicchi un frame per editarlo: gli assegni la sua **foto di background**, zoom/posizione, e ritocchi titolo/testo. `+` aggiunge un frame, 🗑 elimina quello attivo.
+6. Opzioni serie: colore testo, **evidenziatore keyword** (`*parola*` → nastro o cerchio, utile per la CTA es. `DM me *ENGINE*`), **posizione testo** del racconto (alto/centro/basso), numerazione automatica, puntini di avanzamento, quanto scurire la foto, logo.
+7. **Scarica tutte le storie (ZIP)** → un PNG 1080×1920 per frame, pronti da caricare in sequenza. (Ridividendo il testo le foto già assegnate restano al loro posto.)
 
 ## Funzioni AI
 
