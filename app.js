@@ -862,9 +862,10 @@ const TEMPLATES = [
     defaultFormat: '9:16',
     defaultPhoto: 'assets/photo-park.jpg',
     fields: [
+      { key: 'style', scope: 'frame', label: 'Stile di questo frame', type: 'seg', def: 'step',
+        options: [{ val: 'cover', label: 'Cover' }, { val: 'prose', label: 'Racconto' }, { val: 'step', label: 'Step' }, { val: 'cta', label: 'CTA' }] },
       { key: 'title', scope: 'frame', label: 'Titolo del frame', type: 'textarea', def: 'Titolo del frame' },
       { key: 'body', scope: 'frame', label: 'Testo del frame', type: 'textarea', def: 'Testo del frame.\n- punto uno\n- punto due' },
-      { key: 'cover', scope: 'frame', label: 'Frame cover (titolo centrato, senza numero)', type: 'check', def: false },
       { key: 'accent', scope: 'series', label: 'Colore testo', type: 'swatch', def: '#fef6e2' },
       { key: 'hlColor', scope: 'series', label: 'Evidenziatore keyword (*parola* nel testo)', type: 'swatch', def: '#ee6a2d' },
       { key: 'hlCircle', scope: 'series', label: 'Evidenzia a cerchio (invece del nastro)', type: 'check', def: false },
@@ -880,20 +881,26 @@ const TEMPLATES = [
       const T = (S.tsize || 100) / 100;
       const acc = S.accent;
       const idx = S.frames.indexOf(f);
-      if (S.prose && !f.cover) {
+      const hst = S.hlCircle ? 'cerchio' : 'nastro';
+      let style = f.style || (f.cover ? 'cover' : (S.prose ? 'prose' : 'step'));
+      // degradazioni difensive: stili che richiedono un titolo ma non ce l'hanno
+      if (style === 'step' && !(f.title && f.title.trim())) style = 'prose';
+      if (style === 'cover' && !(f.title && f.title.trim()) && (f.body && f.body.trim())) style = 'prose';
+      if (style === 'prose' || style === 'cta') {
+        const centered = style === 'cta';
         c.save(); c.fillStyle = 'rgba(8,10,12,0.32)'; c.fillRect(0, 0, W, H); c.restore();
         const txt = [f.title, f.body].filter(x => x && x.trim()).join('\n');
         c.save();
-        c.fillStyle = acc; c.textAlign = 'left'; c.textBaseline = 'alphabetic';
-        const size = 45 * T;
-        setFont(c, 500, size, SANS);
-        const lines = wrapMarked(c, txt, 912);
-        const lh = size * 1.5;
+        c.fillStyle = acc; c.textAlign = centered ? 'center' : 'left'; c.textBaseline = 'alphabetic';
+        const size = (centered ? 50 : 45) * T;
+        setFont(c, centered ? 600 : 500, size, SANS);
+        const lines = wrapMarked(c, txt, centered ? 860 : 912);
+        const lh = size * (centered ? 1.42 : 1.5);
         const y = H * (S.textY ?? 50) / 100 - (lines.length - 1) * lh / 2;
-        const hst = S.hlCircle ? 'cerchio' : 'nastro';
-        lines.forEach((ln, i) => drawMarkedLine(c, ln, 84, y + i * lh, size, S.hlColor, 'left', 'alphabetic', hst));
+        const x = centered ? W / 2 : 84;
+        lines.forEach((ln, i) => drawMarkedLine(c, ln, x, y + i * lh, size, S.hlColor, centered ? 'center' : 'left', 'alphabetic', hst));
         c.restore();
-      } else if (f.cover) {
+      } else if (style === 'cover') {
         c.save();
         c.fillStyle = acc; c.textAlign = 'center'; c.textBaseline = 'middle';
         let hs = 82 * T; hs = fitSize(c, (f.title || '').split('\n')[0], hs, 880, 700, SANS);
@@ -910,7 +917,8 @@ const TEMPLATES = [
         }
         c.restore();
       } else {
-        let num = 0; for (let i = 0; i <= idx; i++) if (!S.frames[i].cover) num++;
+        const stOf = fr => fr.style || (fr.cover ? 'cover' : 'step');
+        let num = 0; for (let i = 0; i <= idx; i++) if (stOf(S.frames[i]) === 'step') num++;
         const x = 84; let y = H * 0.24;
         c.save();
         c.textAlign = 'left'; c.textBaseline = 'alphabetic';
@@ -1114,6 +1122,7 @@ function stateFor(tpl) {
       s.prose = false;
       s.bulk = SERIES_EXAMPLE;
       s.frames = [makeFrame(tpl)];
+      s.frames[0].style = 'cover';
       s.frames[0].cover = true;
       s.frames[0].title = 'Il growth engine\nnella tua voce';
       s.frames[0].body = '';
@@ -1151,6 +1160,56 @@ function splitBulk(text) {
     const title = lines.shift().replace(/^#+\s*/, '').replace(/^\d+[.)]\s*/, '').trim();
     return { title, body: lines.join('\n').trim(), raw: b };
   });
+}
+
+/* preset di flusso: pattern di stili head / body / tail applicato ai frame */
+const FLOW_PRESETS = [
+  { id: 'hook-step-cta', name: 'Hook → Step → CTA', head: 'cover', body: 'step', tail: 'cta' },
+  { id: 'cover-prose-cta', name: 'Cover → Racconto → CTA', head: 'cover', body: 'prose', tail: 'cta' },
+  { id: 'prose-cta', name: 'Racconto → CTA', head: 'prose', body: 'prose', tail: 'cta' },
+];
+
+const CTA_RE = /\b(dm|dmmi|scrivimi|commenta|comment|tap|swipe|link in bio|scopri|iscriviti|segui|follow|engine)\b/i;
+
+/* indovina lo stile di un blocco in base al contenuto e alla posizione */
+function detectStyle(block, i, n) {
+  const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
+  const first = lines[0] || '';
+  const rest = lines.slice(1).join(' ');
+  const wFirst = first.split(/\s+/).filter(Boolean).length;
+  const hasBullets = /(^|\n)\s*[-•]/.test(block);
+  if (i === n - 1 && CTA_RE.test(block)) return 'cta';
+  if (i === 0 && wFirst <= 7 && !rest) return 'cover';
+  if (hasBullets || (wFirst <= 7 && rest)) return 'step';
+  return 'prose';
+}
+
+/* assegna a un frame stile + splitta title/body di conseguenza */
+function applyStyle(fr, style, p) {
+  fr.style = style;
+  fr.cover = style === 'cover';
+  if (style === 'prose' || style === 'cta') {
+    if (p) { fr.title = ''; fr.body = p.raw; }
+    else { fr.body = [fr.title, fr.body].filter(x => x && x.trim()).join('\n'); fr.title = ''; }
+  } else if (p) { fr.title = p.title; fr.body = p.body; }
+  else if (!(fr.title && fr.title.trim()) && fr.body) {
+    // passo a titolo+corpo ma manca il titolo: promuovi la 1ª frase a titolo
+    const m = fr.body.match(/^(.*?[.!?])\s+([\s\S]+)$/);
+    if (m) { fr.title = m[1].trim(); fr.body = m[2].trim(); }
+    else { fr.title = fr.body; fr.body = ''; }
+  }
+}
+
+/* applica un preset di flusso ai frame correnti (o crea uno scheletro se sono vuoti) */
+function applyPreset(s, preset) {
+  if (s.frames.length < 3 && s.frames.every(f => !(f.title && f.title.trim()) && !(f.body && f.body.trim()))) {
+    const pattern = [preset.head, preset.body, preset.body, preset.body, preset.tail];
+    s.frames = pattern.map(st => { const fr = makeFrame(current); applyStyle(fr, st); return fr; });
+  } else {
+    const n = s.frames.length;
+    s.frames.forEach((fr, i) => applyStyle(fr, i === 0 ? preset.head : (i === n - 1 ? preset.tail : preset.body)));
+  }
+  s.active = 0;
 }
 
 let current = TEMPLATES[0];
@@ -1311,8 +1370,9 @@ function buildSeriesPanel(s) {
   strip.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;';
   s.frames.forEach((fr, i) => {
     const b = document.createElement('button');
-    b.textContent = fr.cover ? '★' : (i + 1);
-    b.title = fr.cover ? 'Cover' : `Frame ${i + 1}`;
+    const st = fr.style || (fr.cover ? 'cover' : 'step');
+    b.textContent = st === 'cover' ? '★' : st === 'cta' ? '➤' : st === 'prose' ? '¶' : (i + 1);
+    b.title = `Frame ${i + 1} · ${st}`;
     b.style.cssText = `width:40px;height:40px;border-radius:8px;font-family:inherit;font-size:13px;cursor:pointer;border:1px solid ${i === s.active ? 'var(--orange)' : '#333'};background:${i === s.active ? '#2d2620' : '#26262a'};color:${i === s.active ? 'var(--cream)' : 'var(--mist)'};`;
     b.onclick = () => { s.active = i; buildAll(); render(); };
     strip.appendChild(b);
@@ -1348,13 +1408,6 @@ function buildSeriesPanel(s) {
   const hint = document.createElement('div');
   hint.style.cssText = 'font-size:10px;color:#8e8d8b;margin:4px 0 8px;line-height:1.4;';
   hint.textContent = 'Separa i frame con «Frame 1 / Frame 2…», una riga --- o una riga vuota. La 1ª riga di ogni blocco è il titolo, il resto è il testo. Le foto già scelte restano al loro posto.';
-  const proseLab = document.createElement('label');
-  proseLab.className = 'check';
-  const proseInp = document.createElement('input');
-  proseInp.type = 'checkbox';
-  proseInp.checked = !!s.prose;
-  proseInp.onchange = () => { s.prose = proseInp.checked; render(); };
-  proseLab.append(proseInp, document.createTextNode('Modalità racconto (testo scorrevole, niente titolo/numero)'));
   const split = document.createElement('button');
   split.className = 'btn ghost';
   split.textContent = '✂️ Dividi in frame';
@@ -1365,16 +1418,29 @@ function buildSeriesPanel(s) {
     s.frames = parsed.map((p, i) => {
       const fr = makeFrame(current);
       if (old[i]) { fr.photo = old[i].photo; fr.zoom = old[i].zoom; fr.ox = old[i].ox; fr.oy = old[i].oy; }
-      if (s.prose) { fr.title = ''; fr.body = p.raw; fr.cover = false; }
-      else { fr.title = p.title; fr.body = p.body; fr.cover = i === 0 && !p.body; }
+      applyStyle(fr, detectStyle(p.raw, i, parsed.length), p);
       return fr;
     });
+    if (s.flow) applyPreset(s, s.flow);
     s.active = 0;
     buildAll();
     render();
   };
-  bulkWrap.append(bulkLab, bulk, hint, proseLab, split);
+  bulkWrap.append(bulkLab, bulk, hint, split);
   panel.appendChild(bulkWrap);
+
+  // preset di flusso: applica uno schema di stili ai frame (o crea uno scheletro)
+  const flowLab = document.createElement('div');
+  flowLab.style.cssText = 'font-size:11px;color:var(--mist);margin:2px 0 6px;';
+  flowLab.textContent = 'Flusso — struttura gli stili dei frame:';
+  panel.appendChild(flowLab);
+  FLOW_PRESETS.forEach(p => {
+    const b = document.createElement('button');
+    b.className = 'btn ghost';
+    b.textContent = (s.flow && s.flow.id === p.id ? '✓ ' : '') + p.name;
+    b.onclick = () => { s.flow = p; applyPreset(s, p); buildAll(); render(); };
+    panel.appendChild(b);
+  });
 
   const hr = document.createElement('hr');
   panel.appendChild(hr);
@@ -1400,6 +1466,24 @@ function buildFields() {
       fieldsEl.appendChild(wrap);
     } else if (f.type === 'range') {
       fieldsEl.appendChild(sliderRow(f.label, target[f.key], f.min, f.max, 1, v => target[f.key] = v));
+    } else if (f.type === 'seg') {
+      const wrap = document.createElement('div');
+      wrap.className = 'field';
+      const lab = document.createElement('label');
+      lab.textContent = f.label;
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;gap:6px;';
+      f.options.forEach(o => {
+        const b = document.createElement('button');
+        b.className = 'fmt' + ((target[f.key] || f.def) === o.val ? ' active' : '');
+        b.style.cssText = 'flex:1;background:#26262a;color:var(--mist);border:1px solid #333;border-radius:6px;padding:7px 4px;font-size:11px;font-family:inherit;cursor:pointer;';
+        if ((target[f.key] || f.def) === o.val) { b.style.borderColor = 'var(--orange)'; b.style.color = 'var(--cream)'; b.style.background = '#2d2620'; }
+        b.textContent = o.label;
+        b.onclick = () => { target[f.key] = o.val; if (f.key === 'style') target.cover = o.val === 'cover'; buildFields(); render(); };
+        row.appendChild(b);
+      });
+      wrap.append(lab, row);
+      fieldsEl.appendChild(wrap);
     } else if (f.type === 'swatch') {
       const wrap = document.createElement('div');
       wrap.className = 'field';
