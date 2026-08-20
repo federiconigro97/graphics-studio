@@ -863,7 +863,7 @@ const TEMPLATES = [
     defaultPhoto: 'assets/photo-park.jpg',
     fields: [
       { key: 'style', scope: 'frame', label: 'Stile di questo frame', type: 'seg', def: 'step',
-        options: [{ val: 'cover', label: 'Cover' }, { val: 'prose', label: 'Racconto' }, { val: 'step', label: 'Step' }, { val: 'cta', label: 'CTA' }] },
+        options: [{ val: 'cover', label: 'Cover' }, { val: 'prose', label: 'Racconto' }, { val: 'step', label: 'Step' }, { val: 'cta', label: 'CTA' }, { val: 'circle', label: 'Cerchio' }] },
       { key: 'title', scope: 'frame', label: 'Titolo del frame', type: 'textarea', def: 'Titolo del frame' },
       { key: 'body', scope: 'frame', label: 'Testo del frame', type: 'textarea', def: 'Testo del frame.\n- punto uno\n- punto due' },
       { key: 'accent', scope: 'series', label: 'Colore testo', type: 'swatch', def: '#fef6e2' },
@@ -899,6 +899,29 @@ const TEMPLATES = [
         const y = H * (S.textY ?? 50) / 100 - (lines.length - 1) * lh / 2;
         const x = centered ? W / 2 : 84;
         lines.forEach((ln, i) => drawMarkedLine(c, ln, x, y + i * lh, size, S.hlColor, centered ? 'center' : 'left', 'alphabetic', hst));
+        c.restore();
+      } else if (style === 'circle') {
+        const { words, heading } = circleWords(f);
+        const cx = W / 2, cy = H * 0.52, R = W * 0.28;
+        drawCycleRing(c, cx, cy, R, acc, Math.max(2.5, W * 0.0035));
+        c.save();
+        c.fillStyle = acc; c.textBaseline = 'middle';
+        const pad = 34, m = 40, baseS = 46 * T;
+        const put = (txt, px, py, align, avail) => {
+          if (!txt) return;
+          c.textAlign = align;
+          setFont(c, 500, fitSize(c, txt, baseS, avail, 500, SANS), SANS);
+          c.fillText(txt, px, py);
+        };
+        put(words[0], cx, cy - R - pad, 'center', W - 2 * m);
+        put(words[2], cx, cy + R + pad, 'center', W - 2 * m);
+        put(words[3], cx - R - pad, cy, 'right', cx - R - pad - m);
+        put(words[1], cx + R + pad, cy, 'left', W - m - (cx + R + pad));
+        if (heading) {
+          c.textAlign = 'center'; c.textBaseline = 'alphabetic';
+          setFont(c, 600, fitSize(c, heading, 46 * T, W - 2 * m, 600, SANS), SANS);
+          c.fillText(heading, W / 2, H * 0.16);
+        }
         c.restore();
       } else if (style === 'cover') {
         c.save();
@@ -1185,9 +1208,24 @@ function detectStyle(block, i, n) {
 }
 
 /* assegna a un frame stile + splitta title/body di conseguenza */
+/* 4 parole (su/dx/giù/sx) + heading opzionale, per lo stile Cerchio.
+   Sintassi: una riga con "a / b / c / d". Testo prima della riga = heading. */
+function circleWords(f) {
+  const raw = [f.title, f.body].filter(x => x && x.trim()).join('\n');
+  const lines = raw.split('\n');
+  let wl = lines.find(l => l.includes('/'));
+  let heading = '';
+  if (wl) heading = lines.filter(l => l !== wl && l.trim()).join(' ').trim();
+  else wl = raw;
+  const words = wl.split(/[\/\n]/).map(w => w.trim()).filter(Boolean).slice(0, 4);
+  while (words.length < 4) words.push('');
+  return { words, heading };
+}
+
 function applyStyle(fr, style, p) {
   fr.style = style;
   fr.cover = style === 'cover';
+  if (style === 'circle') return;
   if (style === 'prose' || style === 'cta') {
     if (p) { fr.title = ''; fr.body = p.raw; }
     else { fr.body = [fr.title, fr.body].filter(x => x && x.trim()).join('\n'); fr.title = ''; }
@@ -1371,7 +1409,7 @@ function buildSeriesPanel(s) {
   s.frames.forEach((fr, i) => {
     const b = document.createElement('button');
     const st = fr.style || (fr.cover ? 'cover' : 'step');
-    b.textContent = st === 'cover' ? '★' : st === 'cta' ? '➤' : st === 'prose' ? '¶' : (i + 1);
+    b.textContent = st === 'cover' ? '★' : st === 'cta' ? '➤' : st === 'prose' ? '¶' : st === 'circle' ? '◎' : (i + 1);
     b.title = `Frame ${i + 1} · ${st}`;
     b.style.cssText = `width:40px;height:40px;border-radius:8px;font-family:inherit;font-size:13px;cursor:pointer;border:1px solid ${i === s.active ? 'var(--orange)' : '#333'};background:${i === s.active ? '#2d2620' : '#26262a'};color:${i === s.active ? 'var(--cream)' : 'var(--mist)'};`;
     b.onclick = () => { s.active = i; buildAll(); render(); };
@@ -1479,7 +1517,15 @@ function buildFields() {
         b.style.cssText = 'flex:1;background:#26262a;color:var(--mist);border:1px solid #333;border-radius:6px;padding:7px 4px;font-size:11px;font-family:inherit;cursor:pointer;';
         if ((target[f.key] || f.def) === o.val) { b.style.borderColor = 'var(--orange)'; b.style.color = 'var(--cream)'; b.style.background = '#2d2620'; }
         b.textContent = o.label;
-        b.onclick = () => { target[f.key] = o.val; if (f.key === 'style') target.cover = o.val === 'cover'; buildFields(); render(); };
+        b.onclick = () => {
+          target[f.key] = o.val;
+          if (f.key === 'style') {
+            target.cover = o.val === 'cover';
+            const bodyEmpty = !(target.body || '').trim() || target.body === 'Testo del frame.\n- punto uno\n- punto due';
+            if (o.val === 'circle' && bodyEmpty && !(target.body || '').includes('/')) target.body = 'content / outbound / sistema / crescita';
+          }
+          buildFields(); render();
+        };
         row.appendChild(b);
       });
       wrap.append(lab, row);

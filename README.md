@@ -44,6 +44,7 @@ Ogni frame può avere uno **stile diverso** — così la serie è già varia e c
 - **Racconto** ¶ — paragrafo scorrevole, per la prosa che convince
 - **Step** — titolo + numero + bullet (listicle stile PROJECT50)
 - **CTA** ➤ — chiusura centrata (con keyword evidenziabile)
+- **Cerchio** ◎ — schema a ciclo con 4 parole (scelta manuale, non auto). Testo del frame: una riga `a / b / c / d` = le 4 parole (su/dx/giù/sx); il testo prima di quella riga diventa un titolo sopra il cerchio.
 
 **Flusso base:**
 
