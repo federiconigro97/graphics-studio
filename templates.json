@@ -1,0 +1,573 @@
+[
+  {
+    "id": "annotated",
+    "name": "Selfie annotato",
+    "series": false,
+    "format": "4:5",
+    "fields": [
+      {
+        "key": "name",
+        "type": "textarea",
+        "def": "FEDERICO\nNIGRO"
+      },
+      {
+        "key": "sub",
+        "type": "text",
+        "def": "\"the operator\""
+      },
+      {
+        "key": "leftTop",
+        "type": "textarea",
+        "def": "AI GTM engine\nnella mia voce"
+      },
+      {
+        "key": "leftList",
+        "type": "textarea",
+        "def": "- content\n- outbound\n- systems\n- growth"
+      },
+      {
+        "key": "rightPlus",
+        "type": "textarea",
+        "def": "+ proposito\n+ metodo\n+ crescita"
+      },
+      {
+        "key": "rightQuote",
+        "type": "text",
+        "def": "\"the project\""
+      },
+      {
+        "key": "bottom",
+        "type": "textarea",
+        "def": "+6 anni nel\ndigitale"
+      },
+      {
+        "key": "inkColor",
+        "type": "swatch",
+        "def": "#ee003a"
+      },
+      {
+        "key": "modern",
+        "type": "check",
+        "def": false
+      },
+      {
+        "key": "hlColor",
+        "type": "swatch",
+        "def": "#f4efe4"
+      },
+      {
+        "key": "hlCircle",
+        "type": "check",
+        "def": false
+      },
+      {
+        "key": "showLogo",
+        "type": "check",
+        "def": true
+      }
+    ]
+  },
+  {
+    "id": "blur-motion",
+    "name": "Blur B/N",
+    "series": false,
+    "format": "4:5",
+    "fields": [
+      {
+        "key": "credit",
+        "type": "textarea",
+        "def": "FEDERICO NIGRO\nDATA SPARK"
+      },
+      {
+        "key": "title",
+        "type": "text",
+        "def": "BUILT IN MOTION"
+      },
+      {
+        "key": "subtitle",
+        "type": "text",
+        "def": "A MOMENT CAPTURED ON THE FAST LANE"
+      },
+      {
+        "key": "motion",
+        "type": "range",
+        "def": 14
+      },
+      {
+        "key": "txtColor",
+        "type": "swatch",
+        "def": "#ee003a"
+      },
+      {
+        "key": "hlColor",
+        "type": "swatch",
+        "def": "#f4efe4"
+      },
+      {
+        "key": "hlCircle",
+        "type": "check",
+        "def": false
+      },
+      {
+        "key": "showLogo",
+        "type": "check",
+        "def": false
+      }
+    ]
+  },
+  {
+    "id": "statement-blur",
+    "name": "Statement su blur",
+    "series": false,
+    "format": "4:5",
+    "fields": [
+      {
+        "key": "headline",
+        "type": "textarea",
+        "def": "Because growth starts when someone feels your brand belongs."
+      },
+      {
+        "key": "blur",
+        "type": "range",
+        "def": 14
+      },
+      {
+        "key": "txtColor",
+        "type": "swatch",
+        "def": "#ee003a"
+      },
+      {
+        "key": "hlColor",
+        "type": "swatch",
+        "def": "#f4efe4"
+      },
+      {
+        "key": "hlCircle",
+        "type": "check",
+        "def": false
+      },
+      {
+        "key": "size",
+        "type": "range",
+        "def": 64
+      },
+      {
+        "key": "showLogo",
+        "type": "check",
+        "def": true
+      }
+    ]
+  },
+  {
+    "id": "color-card",
+    "name": "Card colorata",
+    "series": false,
+    "format": "4:5",
+    "fields": [
+      {
+        "key": "headline",
+        "type": "textarea",
+        "def": "You're not stuck because of what you did. You're stuck because you won't deal with it."
+      },
+      {
+        "key": "cardColor",
+        "type": "swatch",
+        "def": "#639b98"
+      },
+      {
+        "key": "txtColor",
+        "type": "swatch",
+        "def": "#f4efe4"
+      },
+      {
+        "key": "hlColor",
+        "type": "swatch",
+        "def": "#ee003a"
+      },
+      {
+        "key": "hlCircle",
+        "type": "check",
+        "def": false
+      },
+      {
+        "key": "cardW",
+        "type": "range",
+        "def": 620
+      },
+      {
+        "key": "cardH",
+        "type": "range",
+        "def": 780
+      },
+      {
+        "key": "showLogo",
+        "type": "check",
+        "def": true
+      }
+    ]
+  },
+  {
+    "id": "growth-engine",
+    "name": "Blocco Growth Engine",
+    "series": false,
+    "format": "4:5",
+    "fields": [
+      {
+        "key": "headline",
+        "type": "textarea",
+        "def": "THE\nGROWTH\nENGINE"
+      },
+      {
+        "key": "tags",
+        "type": "textarea",
+        "def": "CONTENT\nOUTBOUND\nSYSTEMS\nAI\nPEOPLE"
+      },
+      {
+        "key": "subcopy",
+        "type": "textarea",
+        "def": "Un motore di content e outbound che gira ogni giorno nella tua voce."
+      },
+      {
+        "key": "bgMode",
+        "type": "seg",
+        "def": "cream",
+        "options": [
+          "cream",
+          "color",
+          "photo"
+        ]
+      },
+      {
+        "key": "bgColor",
+        "type": "swatch",
+        "def": "#df2620"
+      },
+      {
+        "key": "txtColor",
+        "type": "swatch",
+        "def": "#1a1a1a"
+      },
+      {
+        "key": "accent",
+        "type": "swatch",
+        "def": "#ee003a"
+      },
+      {
+        "key": "hlColor",
+        "type": "swatch",
+        "def": "#ee003a"
+      },
+      {
+        "key": "hlCircle",
+        "type": "check",
+        "def": false
+      },
+      {
+        "key": "showStar",
+        "type": "check",
+        "def": false
+      }
+    ]
+  },
+  {
+    "id": "text-card",
+    "name": "Card testo pieno",
+    "series": false,
+    "format": "4:5",
+    "fields": [
+      {
+        "key": "eyebrow",
+        "type": "text",
+        "def": ""
+      },
+      {
+        "key": "headline",
+        "type": "textarea",
+        "def": "IDEAS\nMOVE\nPEOPLE."
+      },
+      {
+        "key": "tags",
+        "type": "textarea",
+        "def": ""
+      },
+      {
+        "key": "bgColor",
+        "type": "swatch",
+        "def": "#df2620"
+      },
+      {
+        "key": "txtColor",
+        "type": "swatch",
+        "def": "#f4efe4"
+      },
+      {
+        "key": "accent",
+        "type": "swatch",
+        "def": "#f4efe4"
+      },
+      {
+        "key": "hlColor",
+        "type": "swatch",
+        "def": "#1a1a1a"
+      },
+      {
+        "key": "hlCircle",
+        "type": "check",
+        "def": false
+      },
+      {
+        "key": "align",
+        "type": "seg",
+        "def": "left",
+        "options": [
+          "left",
+          "center"
+        ]
+      },
+      {
+        "key": "showLogo",
+        "type": "check",
+        "def": false
+      }
+    ]
+  },
+  {
+    "id": "hand-photo",
+    "name": "Frase a mano su foto",
+    "series": false,
+    "format": "4:5",
+    "fields": [
+      {
+        "key": "phrase",
+        "type": "textarea",
+        "def": "SLOW THINGS\nFAST MINDS"
+      },
+      {
+        "key": "font",
+        "type": "seg",
+        "def": "hand",
+        "options": [
+          "hand",
+          "script",
+          "marker"
+        ]
+      },
+      {
+        "key": "inkColor",
+        "type": "swatch",
+        "def": "#ee003a"
+      },
+      {
+        "key": "eyebrow",
+        "type": "text",
+        "def": ""
+      },
+      {
+        "key": "posX",
+        "type": "range",
+        "def": 50
+      },
+      {
+        "key": "posY",
+        "type": "range",
+        "def": 50
+      },
+      {
+        "key": "phraseSize",
+        "type": "range",
+        "def": 70
+      },
+      {
+        "key": "rot",
+        "type": "range",
+        "def": -5
+      },
+      {
+        "key": "tint",
+        "type": "range",
+        "def": 22
+      },
+      {
+        "key": "hlColor",
+        "type": "swatch",
+        "def": "#f4efe4"
+      },
+      {
+        "key": "hlCircle",
+        "type": "check",
+        "def": false
+      },
+      {
+        "key": "showLogo",
+        "type": "check",
+        "def": false
+      }
+    ]
+  },
+  {
+    "id": "story-series",
+    "name": "Storie in serie",
+    "series": true,
+    "format": "9:16",
+    "fields": [
+      {
+        "key": "style",
+        "type": "seg",
+        "def": "step",
+        "options": [
+          "cover",
+          "prose",
+          "step",
+          "cta",
+          "circle"
+        ]
+      },
+      {
+        "key": "title",
+        "type": "textarea",
+        "def": "Titolo del frame"
+      },
+      {
+        "key": "body",
+        "type": "textarea",
+        "def": "Testo del frame.\n- punto uno\n- punto due"
+      },
+      {
+        "key": "accent",
+        "type": "swatch",
+        "def": "#f4efe4"
+      },
+      {
+        "key": "hlColor",
+        "type": "swatch",
+        "def": "#ee003a"
+      },
+      {
+        "key": "hlCircle",
+        "type": "check",
+        "def": false
+      },
+      {
+        "key": "textY",
+        "type": "range",
+        "def": 50
+      },
+      {
+        "key": "autonumber",
+        "type": "check",
+        "def": true
+      },
+      {
+        "key": "dots",
+        "type": "check",
+        "def": true
+      },
+      {
+        "key": "tint",
+        "type": "range",
+        "def": 55
+      },
+      {
+        "key": "showLogo",
+        "type": "check",
+        "def": true
+      }
+    ]
+  },
+  {
+    "id": "story-cover",
+    "name": "Cover storia",
+    "series": false,
+    "format": "9:16",
+    "fields": [
+      {
+        "key": "headline",
+        "type": "textarea",
+        "def": "COS’È IL\nGROWTH\nENGINE?"
+      },
+      {
+        "key": "body",
+        "type": "textarea",
+        "def": "Un motore di content e outbound che gira ogni giorno nella tua voce, senza presidiarlo a mano."
+      },
+      {
+        "key": "cta",
+        "type": "text",
+        "def": "SCOPRI DI PIÙ"
+      },
+      {
+        "key": "brand",
+        "type": "text",
+        "def": "data spark"
+      },
+      {
+        "key": "accent",
+        "type": "swatch",
+        "def": "#f4efe4"
+      },
+      {
+        "key": "tint",
+        "type": "range",
+        "def": 45
+      },
+      {
+        "key": "showLogo",
+        "type": "check",
+        "def": true
+      }
+    ]
+  },
+  {
+    "id": "story-circle",
+    "name": "Cerchio / ciclo",
+    "series": false,
+    "format": "9:16",
+    "fields": [
+      {
+        "key": "top",
+        "type": "text",
+        "def": "content"
+      },
+      {
+        "key": "right",
+        "type": "text",
+        "def": "outbound"
+      },
+      {
+        "key": "bottom",
+        "type": "text",
+        "def": "sistema"
+      },
+      {
+        "key": "left",
+        "type": "text",
+        "def": "crescita"
+      },
+      {
+        "key": "accent",
+        "type": "swatch",
+        "def": "#f4efe4"
+      },
+      {
+        "key": "ring",
+        "type": "range",
+        "def": 30
+      },
+      {
+        "key": "cy",
+        "type": "range",
+        "def": 46
+      },
+      {
+        "key": "tint",
+        "type": "range",
+        "def": 30
+      },
+      {
+        "key": "showLogo",
+        "type": "check",
+        "def": false
+      }
+    ]
+  }
+]

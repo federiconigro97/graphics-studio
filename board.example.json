@@ -1,0 +1,42 @@
+[
+  {
+    "name": "01_growth-engine",
+    "template": "growth-engine",
+    "fields": {
+      "headline": "THE\nGROWTH\nENGINE",
+      "tags": "CONTENT\nOUTBOUND\nSYSTEMS\nAI\nPEOPLE",
+      "subcopy": "Un motore di content e outbound che gira ogni giorno nella tua voce.",
+      "bgMode": "cream",
+      "txtColor": "#1a1a1a",
+      "accent": "#ee003a"
+    }
+  },
+  {
+    "name": "02_ideas-move-people",
+    "template": "text-card",
+    "fields": { "headline": "IDEAS\nMOVE\nPEOPLE.", "bgColor": "#df2620", "txtColor": "#f4efe4" }
+  },
+  {
+    "name": "03_ai-marketing",
+    "template": "text-card",
+    "fields": { "headline": "AI\nMARKETING\nBRANDS\nPEOPLE\nFREEDOM", "bgColor": "#ee6a2d", "txtColor": "#1a1a1a", "align": "left" }
+  },
+  {
+    "name": "04_slow-things",
+    "template": "hand-photo",
+    "photo": "assets/photo-park.jpg",
+    "fields": { "phrase": "SLOW THINGS\nFAST MINDS", "font": "hand", "inkColor": "#ee003a", "tint": 25 }
+  },
+  {
+    "name": "05_build-explore",
+    "template": "growth-engine",
+    "photo": "assets/photo-cafe.jpg",
+    "fields": {
+      "headline": "BUILD\nEXPLORE\nCREATE\nREPEAT",
+      "tags": "IDEAS\nSYSTEMS\nPLACES\nPEOPLE",
+      "subcopy": "A better me.",
+      "bgMode": "photo",
+      "accent": "#ee003a"
+    }
+  }
+]

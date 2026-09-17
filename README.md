@@ -2,13 +2,22 @@
 
 App locale per ricreare le 7 grafiche di riferimento cambiando **solo copy e soggetto** (le tue foto al posto della persona originale). Layout, font e palette sono bloccati sui brand colors Data Spark. Al posto di stelle/globo c'è il logo spark (`assets/logo.svg`).
 
+> **Brand 2026-09:** accenti = Tiger Flame `#ee003a` + Arancio `#ee6a2d` + Brick Red `#df2620`, neutro Alabaster `#dbdfdd`. Font = **Helvetica bold** (statement) + **Reenie Beanie** (scrittura a mano). Fonte unica: [`../brand/brand-system.md`](../brand/brand-system.md) + moodboard in `../brand/moodboard/`. Se cambi palette/font qui (`BRAND`/`HAND` in `app.js`) aggiorna anche quel file.
+
 ## Come si apre
 
 Doppio click su **`start.command`** (avvia un server locale su `localhost:8420` e apre il browser). Serve il server: aprendo `index.html` direttamente il browser blocca l'export PNG.
 
-## Come si usa
+## Render headless (JSON → PNG, per API/flow)
 
-1. Scegli il **template** (7, uno per ogni reference).
+Oltre all'uso manuale, lo studio è pilotabile da codice — è la base per il content engine che ricrea la moodboard in automatico.
+
+- **In pagina:** `window.GS.render(spec)` / `window.GS.renderAll([spec,…])` → dataURL PNG. `spec = { template, format?, photo?, zoom?, ox?, oy?, tsize?, fields:{…} }`. `window.GS.templates()` elenca template e campi.
+- **Da terminale:** `npm install` una volta, poi `node render.mjs [board.json] [outDir]`. Usa il Chrome di sistema (puppeteer-core, nessun download). Vedi `board.example.json` per il formato.
+
+## Come si usa (manuale)
+
+1. Scegli il **template**.
 2. Scegli la **foto**: le tue 4 sono precaricate, col `+` ne carichi altre (restano solo in sessione, non vengono salvate).
 3. Regola **zoom / posizione** della foto.
 4. Cambia il **copy** nei campi. I colori si scelgono solo dagli swatch brand.
@@ -20,13 +29,13 @@ Doppio click su **`start.command`** (avvia un server locale su `localhost:8420` 
 
 | Template | Reference |
 |---|---|
-| Selfie annotato | selfie con scritte a mano arancio + frecce (Ana Jords) |
+| Selfie annotato | selfie con scritte a mano + frecce |
 | Blur B/N | surfer mosso, testo rosso piccolo |
-| Cartello | "You are way too creative for a 9 to 5" |
-| Cutout sticker | faccia ritagliata su fondo verde |
 | Statement su blur | "Because growth starts…" rosso giustificato |
-| Card colorata | rettangolo blu + testo bianco giustificato |
-| Parole sparse | "Go with the flow" + serif centrale |
+| Card colorata | rettangolo pieno + testo su foto |
+| Blocco Growth Engine | headline enorme (THE GROWTH ENGINE) su cream/colore/foto + colonna tag rossa + sottotesto Helvetica |
+| Card testo pieno | statement grande su colore pieno, niente foto (IDEAS MOVE PEOPLE.) — ideale per caroselli |
+| Frase a mano su foto | 1 foto lifestyle + 1 frase a mano ben posizionata (SLOW THINGS FAST MINDS) — la tile più frequente |
 
 **Storie (9:16)** — si aprono già in formato story
 
@@ -59,18 +68,21 @@ Ogni frame può avere uno **stile diverso** — così la serie è già varia e c
 7. Opzioni serie: colore testo, **evidenziatore keyword** (`*parola*` → nastro o cerchio, es. `DM me *ENGINE*`), **posizione testo** (alto/centro/basso), numerazione automatica, puntini di avanzamento, quanto scurire la foto, logo.
 8. **Scarica tutte le storie (ZIP)** → un PNG 1080×1920 per frame, pronti da caricare in sequenza. (Ridividendo il testo le foto già assegnate restano al loro posto.)
 
-## Funzioni AI
+## Foto AI on-brand (Gemini)
 
-- **Cutout sticker → "✂️ Ritaglia il soggetto dalla foto (AI)"**: rimozione sfondo direttamente nel browser (@imgly/background-removal). Al primo uso scarica il modello (~40MB, poi resta in cache). Ritaglia il soggetto dalla foto selezionata e lo mette su tinta brand con bordo sticker bianco. In alternativa puoi sempre caricare un PNG già scontornato col `+`.
-- **Cartello → "🪄 Genera avatar con la mia faccia (AI)"**: genera lo sfondo (tu che reggi un cartello, vista dall'alto stile reference) partendo dalla foto selezionata, via Gemini `gemini-2.5-flash-image`. Serve una API key gratuita da [aistudio.google.com](https://aistudio.google.com) → incollala nel campo dedicato (resta in `localStorage`, solo sul tuo Mac). Il testo del campo "Testo sul cartello" viene passato a Gemini, che lo scrive direttamente sul cartello generato — e il cartello sovrapposto dell'app si spegne da solo. Se preferisci il cartello disegnato dall'app (testo sempre nitido e modificabile senza rigenerare), riaccendi il checkbox "Cartello disegnato dall'app" e svuota il testo prima di generare.
+Sezione **Foto AI on-brand** nella sidebar: genera foto lifestyle nello stile della moodboard (cinematografico, caldo, desaturato) quando le foto del telefono non bastano.
 
-## Font (allineati alle reference)
+- Serve una **API key Gemini** gratuita da [aistudio.google.com](https://aistudio.google.com) → incollala nel campo (resta in `localStorage`, solo sul tuo Mac).
+- Scrivi la **scena** (in inglese rende meglio) o usa un **preset** (Surf / Moto / Laptop / Costa / Aereo / Interno / Città / Oceano). Uno stile-base brand viene appeso in automatico a ogni prompt, così l'output è coerente.
+- **"Usa la mia faccia"**: parte dalla foto selezionata come riferimento, per generare scene con te dentro.
+- Il risultato entra nella lista foto e viene selezionato: usalo con qualsiasi template. Aspect ratio = formato attivo (4:5 o 9:16). Modello: `gemini-2.5-flash-image`.
 
-- Annotazioni a mano + cartello: **Permanent Marker**
-- Parole sparse calligrafiche: **Zeyada**
-- Statement / card / blur B&N: **Helvetica Neue** (di sistema)
-- Testo centrale serif: **EB Garamond**
-- **Varianti "Font moderno"**: Selfie annotato e Parole sparse hanno un checkbox che passa le scritte a Helvetica (pulito, senza jitter), stile poster contemporaneo.
+## Font (brand 2026-09 — solo 2 voci, niente serif)
+
+- **Helvetica** (Now Display Bold / Neue di sistema): tutti gli statement, headline, card, sottotesti, occhielli/tag.
+- **Scrittura a mano**: font primario **Reenie Beanie** (marker autentico/organico, stile board "SLOW THINGS FAST MINDS", rispetta maiuscolo E minuscolo) per Selfie annotato e "Frase a mano su foto". Alternative nel toggle: **Zeyada** (corsivo) e **Permanent Marker**.
+- Il **serif è fuori dal brand**: anche i paragrafi che ragionano vanno in Helvetica.
+- **Checkbox "Font moderno"**: Selfie annotato e Parole sparse passano le scritte grandi a Helvetica (pulito, senza jitter).
 
 ## Evidenziatore
 

@@ -1,0 +1,13 @@
+{
+  "name": "graphics-studio",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Data Spark graphics studio — UI + headless render (JSON board spec -> PNG)",
+  "scripts": {
+    "render": "node render.mjs"
+  },
+  "dependencies": {
+    "puppeteer-core": "^23.11.1"
+  }
+}

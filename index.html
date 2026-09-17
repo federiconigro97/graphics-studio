@@ -6,14 +6,15 @@
 <title>Data Spark · Graphics Studio</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Permanent+Marker&family=Zeyada&family=La+Belle+Aurore&family=Shadows+Into+Light&family=Archivo:wght@500;600;700&family=EB+Garamond:ital,wght@0,400;1,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Reenie+Beanie&family=Shadows+Into+Light+Two&family=Caveat:wght@600;700&family=Permanent+Marker&family=Zeyada&family=La+Belle+Aurore&family=Shadows+Into+Light&family=Archivo:wght@500;600;700&family=EB+Garamond:ital,wght@0,400;1,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
-    --ink: #212123;
-    --deep: #0B3042;
-    --cream: #fef6e2;
+    --ink: #1a1a1a;
+    --deep: #1a1a1a;
+    --cream: #f4efe4;
     --mist: #d8dede;
-    --orange: #ee6a2d;
+    --orange: #ee003a;
+    --brick: #df2620;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -233,6 +234,11 @@
       <label class="head">Foto (il soggetto sei tu)</label>
       <div class="photo-grid" id="photoGrid"></div>
       <input type="file" id="photoUpload" accept="image/*" hidden>
+    </section>
+
+    <section>
+      <label class="head">Foto AI on-brand (Gemini)</label>
+      <div id="aiPhoto"></div>
     </section>
 
     <section>

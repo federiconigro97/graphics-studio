@@ -19,13 +19,15 @@ function setFormat(f) {
   render();
 }
 
-const BRAND = ['#7b98a8','#0B3042','#C6A890','#fef6e2','#b6b394','#8e8d8b','#518fa6','#ee6a2d','#f43334','#212123','#d8dede'];
+// Palette allineata a brand/brand-system.md (moodboard 2026-09). Accenti: Tiger Flame #ee003a + Arancio #ee6a2d.
+const BRAND = ['#1a1a1a','#ee003a','#ee6a2d','#df2620','#8a6a5a','#639b98','#1a5e99','#dbdfdd','#f4efe4','#7d766c','#ffffff'];
 
 /* Font stack fedeli alle reference */
-const SANS = "'Helvetica Neue','Archivo',sans-serif";      // statement / card / blur B&N
-const MARKER = "'Permanent Marker',cursive";                // annotazioni a mano + cartello
-const SCRIPT = "'Zeyada','La Belle Aurore',cursive";        // parole sparse calligrafiche
-const SERIF = "'EB Garamond',serif";
+const SANS = "'Helvetica Now Display','Helvetica Neue',Helvetica,Arial,sans-serif";      // statement / card / blur B&N
+const HAND = "'Reenie Beanie','Shadows Into Light Two',cursive"; // scrittura a mano primaria (marker autentico, stile board "Slow things fast minds", maiuscolo+minuscolo)
+const MARKER = "'Permanent Marker',cursive";                // marker pesante (solo cartello)
+const SCRIPT = "'Zeyada','La Belle Aurore',cursive";        // corsivo calligrafico (opzionale)
+// serif rimosso dal brand 2026-09 (solo scrittura a mano + Helvetica bold)
 
 /* Spark logo path (from data spark logo black on white.svg, viewBox 1276) */
 const LOGO_PATH = new Path2D("M938.91 267.388C829.401 348.673 829.401 348.673 719.892 429.959C667.595 349.908 667.595 349.908 615.299 269.857C581.329 378.512 581.329 378.512 547.36 487.166C429.581 481.817 429.581 481.817 311.803 476.465C373.262 550.96 373.262 550.96 434.722 625.455C316.496 700.979 316.496 700.979 198.271 776.502C322.307 772.798 322.307 772.798 446.343 769.094C398.293 885.568 398.293 885.568 350.243 1002.04C465.115 916.231 465.115 916.231 579.988 830.418C634.52 919.522 634.52 919.522 689.051 1008.63C723.468 890.096 723.468 890.096 757.886 771.564C883.039 778.56 883.039 778.56 1008.19 785.557C939.357 707.152 939.357 707.152 870.522 628.748C988.972 552.607 988.972 552.607 1107.42 476.465C980.783 481.632 980.783 481.632 854.145 486.797C896.528 377.092 896.528 377.092 938.91 267.388Z");
@@ -226,7 +228,7 @@ function drawJustified(c, opts) {
 /* handwritten multi-line slot with per-line jitter */
 function drawHand(c, opts) {
   const { text, x, y, size, rot = 0, color, align = 'center', lh = 1.35,
-          family = MARKER, weight = 400, seed = 1, jitter = true, hl, hlStyle = 'nastro' } = opts;
+          family = HAND, weight = 400, seed = 1, jitter = true, hl, hlStyle = 'nastro' } = opts;
   if (!text || !text.trim()) return;
   const rnd = mulberry32(seed);
   c.save();
@@ -369,22 +371,6 @@ function drawGrain(c, alpha = 0.08) {
   c.restore();
 }
 
-/* organic blob path (sticker cutout) */
-function blobPath(c, cx, cy, rx, ry, seed) {
-  const rnd = mulberry32(seed);
-  const o1 = rnd() * 6, o2 = rnd() * 6;
-  const n = 48;
-  c.beginPath();
-  for (let i = 0; i <= n; i++) {
-    const t = i / n * Math.PI * 2;
-    const r = 1 + 0.05 * Math.sin(3 * t + o1) + 0.035 * Math.sin(7 * t + o2);
-    const px = cx + Math.cos(t) * rx * r;
-    const py = cy + Math.sin(t) * ry * r;
-    if (i === 0) c.moveTo(px, py); else c.lineTo(px, py);
-  }
-  c.closePath();
-}
-
 /* fit a single line into maxW starting from size */
 function fitSize(c, text, size, maxW, weight, family) {
   let s = size;
@@ -394,65 +380,6 @@ function fitSize(c, text, size, maxW, weight, family) {
     setFont(c, weight, s, family);
   }
   return s;
-}
-
-/* ---------- AI: rimozione sfondo in-browser (@imgly/background-removal) ---------- */
-const cutouts = {};          // photo src -> HTMLImageElement con alpha
-let bgRemovalMod = null;
-
-async function makeCutout(src, setStatus) {
-  if (cutouts[src]) return cutouts[src];
-  if (!bgRemovalMod) {
-    setStatus('Scarico il modello AI (solo la prima volta, ~40MB)…');
-    bgRemovalMod = await import('https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.5.5/+esm');
-  }
-  setStatus('Ritaglio il soggetto…');
-  const blob = await fetch(src).then(r => r.blob());
-  const out = await bgRemovalMod.removeBackground(blob, {
-    progress: (k, cur, tot) => {
-      if (k.startsWith('fetch')) setStatus(`Scarico il modello… ${Math.round(cur / tot * 100)}%`);
-    }
-  });
-  const raw = await loadImg(URL.createObjectURL(out));
-  // pulizia: azzera l'alpha residua semitrasparente (aloni di sfondo)
-  const cv = document.createElement('canvas');
-  cv.width = raw.naturalWidth;
-  cv.height = raw.naturalHeight;
-  const g = cv.getContext('2d');
-  g.drawImage(raw, 0, 0);
-  const id = g.getImageData(0, 0, cv.width, cv.height);
-  for (let i = 3; i < id.data.length; i += 4) {
-    if (id.data[i] < 90) id.data[i] = 0;
-  }
-  g.putImageData(id, 0, 0);
-  const img = await loadImg(cv.toDataURL());
-  cutouts[src] = img;
-  return img;
-}
-
-/* sticker con bordo bianco attorno alla silhouette (alpha) */
-function drawSticker(c, img, x, y, w, h, outline = 20) {
-  const off = document.createElement('canvas');
-  off.width = Math.max(1, Math.round(w));
-  off.height = Math.max(1, Math.round(h));
-  const o = off.getContext('2d');
-  o.drawImage(img, 0, 0, off.width, off.height);
-  o.globalCompositeOperation = 'source-in';
-  o.fillStyle = '#f4efe4';
-  o.fillRect(0, 0, off.width, off.height);
-  c.save();
-  c.shadowColor = 'rgba(0,0,0,0.45)';
-  c.shadowBlur = 40;
-  c.shadowOffsetY = 16;
-  c.drawImage(off, x, y, w, h);
-  c.shadowColor = 'transparent';
-  const steps = 36;
-  for (let i = 0; i < steps; i++) {
-    const a = i / steps * Math.PI * 2;
-    c.drawImage(off, x + Math.cos(a) * outline, y + Math.sin(a) * outline, w, h);
-  }
-  c.drawImage(img, x, y, w, h);
-  c.restore();
 }
 
 /* ---------- AI: avatar di sfondo via Gemini (nano-banana), parte dalla foto scelta ---------- */
@@ -465,21 +392,33 @@ function imgToB64(img, maxDim = 1024) {
   return cv.toDataURL('image/jpeg', 0.9).split(',')[1];
 }
 
-async function generateAvatar(s, setStatus) {
+/* Stile-foto brand: appeso a ogni prompt così l'output ha il look moodboard (cinematografico, caldo, desaturato). */
+const BRAND_PHOTO_STYLE = 'Editorial film photography, cinematic, warm natural light, high contrast, slightly desaturated muted tones, candid aspirational lifestyle, 35mm, shallow depth of field. No text, no logos, no watermark.';
+
+const SCENE_PRESETS = [
+  { label: 'Surf', prompt: 'a lone surfer riding a clean ocean wave at golden hour, shot from the beach' },
+  { label: 'Moto', prompt: 'a vintage cafe racer motorcycle parked on a sunlit european city street' },
+  { label: 'Laptop', prompt: 'a man working on a laptop in a warm minimal cafe, side profile, focused' },
+  { label: 'Costa', prompt: 'a dramatic rocky coastline with turquoise sea under warm afternoon light' },
+  { label: 'Aereo', prompt: 'the view out of an airplane window over clouds at sunset, wing visible' },
+  { label: 'Interno', prompt: 'a warm minimal interior with a designer leather chair, plants and books, cozy evening light' },
+  { label: 'Città', prompt: 'a solo figure walking across a modern city bridge, cinematic wide shot from behind' },
+  { label: 'Oceano', prompt: 'open sea horizon from a boat, spray and motion, adventurous mood' },
+];
+
+/* Genera una foto lifestyle on-brand via Gemini. opts: { prompt, useFace, faceSrc, format } */
+async function generatePhoto({ prompt, useFace, faceSrc, format }, setStatus) {
   const key = (localStorage.getItem('geminiKey') || '').trim();
-  if (!key) { setStatus('Serve la API key Gemini (campo qui sopra, la trovi su aistudio.google.com).'); return; }
-  setStatus('Preparo la foto di riferimento…');
-  const ref = await loadImg(s.photo);
-  const signText = (s.signText || '').trim();
-  let prompt = s.aiPrompt;
-  if (signText) {
-    const lines = signText.split('\n').map(l => `"${l}"`).join(' / ');
-    prompt += ` The white sign must display exactly this text, hand-written in bold red marker capital letters, keeping these line breaks: ${lines}. Spell it exactly as given, no other text anywhere in the image.`;
+  if (!key) { setStatus('Serve la API key Gemini (campo qui sopra, gratis su aistudio.google.com).'); return; }
+  if (!prompt || !prompt.trim()) { setStatus('Scrivi una scena o scegli un preset.'); return; }
+  const parts = [];
+  if (useFace && faceSrc) {
+    setStatus('Preparo la foto di riferimento…');
+    try { parts.push({ inline_data: { mime_type: 'image/jpeg', data: imgToB64(await loadImg(faceSrc)) } }); } catch {}
   }
-  const parts = [
-    { inline_data: { mime_type: 'image/jpeg', data: imgToB64(ref) } },
-    { text: prompt }
-  ];
+  const full = `${prompt.trim()}.${useFace ? ' Feature this exact same person, identical face and hair.' : ''} ${BRAND_PHOTO_STYLE}`;
+  parts.push({ text: full });
+  const ar = format === '9:16' ? '9:16' : '4:5';
   const call = (genCfg) => fetch(
     'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent',
     {
@@ -488,8 +427,8 @@ async function generateAvatar(s, setStatus) {
       body: JSON.stringify({ contents: [{ parts }], ...(genCfg ? { generationConfig: genCfg } : {}) })
     }
   );
-  setStatus('Genero l\'avatar… (10-30 secondi)');
-  let resp = await call({ responseModalities: ['TEXT', 'IMAGE'], imageConfig: { aspectRatio: '4:5' } });
+  setStatus('Genero la foto… (10-30 secondi)');
+  let resp = await call({ responseModalities: ['TEXT', 'IMAGE'], imageConfig: { aspectRatio: ar } });
   if (!resp.ok) resp = await call(null);
   const json = await resp.json();
   if (!resp.ok) { setStatus('Errore Gemini: ' + (json.error?.message || resp.status)); return; }
@@ -498,16 +437,51 @@ async function generateAvatar(s, setStatus) {
   const d = part.inlineData || part.inline_data;
   const url = `data:${d.mimeType || d.mime_type};base64,${d.data}`;
   userPhotos.push(url);
-  s.photo = url;
-  if (signText) {
-    // il testo è già nel cartello generato: spegni quello sovrapposto dall'app
-    s.overlaySign = false;
-    buildFields();
-  }
+  photoTarget().photo = url;
   buildPhotos();
-  setStatus(signText
-    ? 'Avatar creato ✓ con il testo sul cartello (overlay app disattivato)'
-    : 'Avatar creato ✓ (posiziona il cartello dell\'app sul segno bianco)');
+  render();
+  setStatus('Foto creata ✓ e selezionata.');
+}
+
+/* headline impilata stile moodboard: righe manuali (\n), peso bold, interlinea stretta,
+   ogni riga adattata alla larghezza. Ritorna { size, bottom } per posizionare gli altri elementi. */
+function drawStackHeadline(c, lines, x, y, maxSize, maxW, color, weight = 800, lh = 0.94, align = 'left', hlColor, hlStyle = 'nastro') {
+  const rows = lines.map(l => l).filter(l => l.trim().length);
+  if (!rows.length) return { size: 0, bottom: y };
+  let size = maxSize;
+  for (const l of rows) size = Math.min(size, fitSize(c, stripMarks(l), maxSize, maxW, weight, SANS));
+  setFont(c, weight, size, SANS);
+  letterSpace(c, -size * 0.01);
+  c.textBaseline = 'alphabetic';
+  c.fillStyle = color;
+  let cy = y + size * 0.82;
+  for (const l of rows) {
+    drawMarkedLine(c, l, x, cy, size, hlColor, align, 'alphabetic', hlStyle);
+    cy += size * lh;
+  }
+  letterSpace(c, 0);
+  return { size, bottom: cy - size * (lh - 0.82) };
+}
+
+/* lista tag moodboard: uppercase, tracking largo. Verticale (colonna) o riga con separatore. */
+function drawTagList(c, tags, x, y, size, color, opts = {}) {
+  const { vertical = true, lh = 2.1, align = 'left', ls = 3, weight = 600, sep = '   ·   ' } = opts;
+  const items = tags.map(t => t.trim().toUpperCase()).filter(Boolean);
+  if (!items.length) return y;
+  c.save();
+  setFont(c, weight, size, SANS);
+  letterSpace(c, ls);
+  c.fillStyle = color;
+  c.textBaseline = 'alphabetic';
+  c.textAlign = align;
+  if (vertical) {
+    items.forEach((t, i) => c.fillText(t, x, y + i * size * lh));
+  } else {
+    c.fillText(items.join(sep), x, y);
+  }
+  letterSpace(c, 0);
+  c.restore();
+  return vertical ? y + items.length * size * lh : y;
 }
 
 /* ---------- template definitions ---------- */
@@ -526,9 +500,9 @@ const TEMPLATES = [
       { key: 'rightPlus', label: 'Lista + a dx', type: 'textarea', def: '+ proposito\n+ metodo\n+ crescita' },
       { key: 'rightQuote', label: 'Nota bassa a dx', type: 'text', def: '"the project"' },
       { key: 'bottom', label: 'Riga in basso', type: 'textarea', def: '+6 anni nel\ndigitale' },
-      { key: 'inkColor', label: 'Colore scritte', type: 'swatch', def: '#ee6a2d' },
-      { key: 'modern', label: 'Font moderno (Helvetica, niente marker)', type: 'check', def: false },
-      { key: 'hlColor', label: 'Evidenziatore (*parola* nel testo)', type: 'swatch', def: '#fef6e2' },
+      { key: 'inkColor', label: 'Colore scritte', type: 'swatch', def: '#ee003a' },
+      { key: 'modern', label: 'Font moderno (Helvetica, niente scrittura a mano)', type: 'check', def: false },
+      { key: 'hlColor', label: 'Evidenziatore (*parola* nel testo)', type: 'swatch', def: '#f4efe4' },
       { key: 'hlCircle', label: 'Evidenzia a cerchio (invece del nastro)', type: 'check', def: false },
       { key: 'showLogo', label: 'Logo spark in alto a sx', type: 'check', def: true },
     ],
@@ -540,7 +514,7 @@ const TEMPLATES = [
       c.restore();
       const k = s.inkColor, T = (s.tsize || 100) / 100 * (s.modern ? 0.85 : 1);
       const st = { color: k, hl: s.hlColor, hlStyle: s.hlCircle ? 'cerchio' : 'nastro',
-                   family: s.modern ? SANS : MARKER,
+                   family: s.modern ? SANS : HAND,
                    weight: s.modern ? 500 : 400,
                    jitter: !s.modern };
       drawHand(c, { ...st, text: s.name, x: 780, y: sy(150), size: 76 * T, rot: -7, seed: 11 });
@@ -569,8 +543,8 @@ const TEMPLATES = [
       { key: 'title', label: 'Titolo a dx', type: 'text', def: 'BUILT IN MOTION' },
       { key: 'subtitle', label: 'Sottotitolo a dx', type: 'text', def: 'A MOMENT CAPTURED ON THE FAST LANE' },
       { key: 'motion', label: 'Effetto mosso', type: 'range', def: 14, min: 0, max: 40 },
-      { key: 'txtColor', label: 'Colore testo', type: 'swatch', def: '#f43334' },
-      { key: 'hlColor', label: 'Evidenziatore (*parola* nel testo)', type: 'swatch', def: '#fef6e2' },
+      { key: 'txtColor', label: 'Colore testo', type: 'swatch', def: '#ee003a' },
+      { key: 'hlColor', label: 'Evidenziatore (*parola* nel testo)', type: 'swatch', def: '#f4efe4' },
       { key: 'hlCircle', label: 'Evidenzia a cerchio (invece del nastro)', type: 'check', def: false },
       { key: 'showLogo', label: 'Logo spark in basso', type: 'check', def: false },
     ],
@@ -609,109 +583,6 @@ const TEMPLATES = [
   },
 
   {
-    id: 'sign',
-    name: 'Cartello',
-    hint: 'scritta marker sul cartello',
-    defaultPhoto: 'assets/photo-park.jpg',
-    fields: [
-      { key: 'signText', label: 'Testo sul cartello', type: 'textarea', def: 'YOU ARE\nWAY TOO CREATIVE\nFOR A 9 TO 5' },
-      { key: '_key', type: 'apikey', label: 'Gemini API key (aistudio.google.com)' },
-      { key: 'aiPrompt', label: 'Scena avatar (prompt)', type: 'textarea',
-        def: 'Cinematic photo of this exact same person, identical face and hair, standing alone in the middle of a sunlit pedestrian crosswalk seen from above, holding up a plain blank white rectangular sign with both hands above his head, long shadow on the asphalt, warm afternoon light, editorial film photography, 4:5 vertical.' },
-      { key: '_gen', type: 'button', label: '🪄 Genera avatar con la mia faccia (AI)',
-        action: (s, setStatus) => generateAvatar(s, setStatus) },
-      { key: 'overlaySign', label: 'Cartello disegnato dall\'app (spegnilo se il testo lo ha già scritto Gemini)', type: 'check', def: true },
-      { key: 'signX', label: 'Cartello ↔', type: 'range', def: 540, min: 100, max: 980 },
-      { key: 'signY', label: 'Cartello ↕', type: 'range', def: 350, min: 100, max: 1750 },
-      { key: 'signW', label: 'Larghezza cartello', type: 'range', def: 460, min: 240, max: 820 },
-      { key: 'signRot', label: 'Rotazione', type: 'range', def: -2, min: -15, max: 15 },
-      { key: 'inkColor', label: 'Colore marker', type: 'swatch', def: '#f43334' },
-      { key: 'hlColor', label: 'Evidenziatore (*parola* nel testo)', type: 'swatch', def: '#fef6e2' },
-      { key: 'hlCircle', label: 'Evidenzia a cerchio (invece del nastro)', type: 'check', def: false },
-      { key: 'showLogo', label: 'Logo spark sul cartello', type: 'check', def: false },
-    ],
-    draw(c, s, img) {
-      coverDraw(c, img, s.zoom, s.ox, s.oy);
-      if (!s.overlaySign) { drawGrain(c, 0.05); return; }
-      const lines = s.signText.split('\n').filter(l => l.trim());
-      const pad = 34;
-      let size = 64 * (s.tsize || 100) / 100;
-      for (const l of lines) size = Math.min(size, fitSize(c, stripMarks(l), size, s.signW - pad * 2, 400, "'Permanent Marker'"));
-      const lh = size * 1.28;
-      const signH = lines.length * lh + pad * 2 + (s.showLogo ? size * 0.9 : 0);
-      c.save();
-      c.translate(s.signX, s.signY);
-      c.rotate(s.signRot * Math.PI / 180);
-      c.shadowColor = 'rgba(0,0,0,0.35)';
-      c.shadowBlur = 24;
-      c.shadowOffsetY = 10;
-      c.fillStyle = '#fdfdfa';
-      c.beginPath();
-      c.roundRect(-s.signW / 2, -signH / 2, s.signW, signH, 6);
-      c.fill();
-      c.shadowColor = 'transparent';
-      c.fillStyle = s.inkColor;
-      c.textAlign = 'center';
-      c.textBaseline = 'middle';
-      setFont(c, 400, size, "'Permanent Marker'");
-      const top = -signH / 2 + pad + lh / 2;
-      lines.forEach((l, i) => drawMarkedLine(c, l, 0, top + i * lh, size, s.hlColor, 'center', 'middle', s.hlCircle ? 'cerchio' : 'nastro'));
-      if (s.showLogo) drawLogo(c, 0, top + lines.length * lh + size * 0.25, size * 0.8, s.inkColor);
-      c.restore();
-      drawGrain(c, 0.05);
-    }
-  },
-
-  {
-    id: 'sticker',
-    name: 'Cutout sticker',
-    hint: 'faccia ritagliata su tinta',
-    defaultPhoto: 'assets/photo-selfie.jpg',
-    fields: [
-      { key: '_cut', type: 'button', label: '✂️ Ritaglia il soggetto dalla foto (AI)',
-        action: (s, setStatus) => makeCutout(s.photo, setStatus).then(() => setStatus('Soggetto ritagliato ✓')) },
-      { key: 'bgColor', label: 'Sfondo', type: 'swatch', def: '#0B3042' },
-      { key: 'caption', label: 'Caption (opzionale)', type: 'text', def: '' },
-      { key: 'capColor', label: 'Colore caption', type: 'swatch', def: '#fef6e2' },
-      { key: 'hlColor', label: 'Evidenziatore (*parola* nella caption)', type: 'swatch', def: '#ee6a2d' },
-      { key: 'hlCircle', label: 'Evidenzia a cerchio (invece del nastro)', type: 'check', def: false },
-      { key: 'cutSize', label: 'Dimensione soggetto', type: 'range', def: 100, min: 40, max: 180 },
-      { key: 'showLogo', label: 'Logo spark in basso', type: 'check', def: true },
-    ],
-    draw(c, s, img) {
-      c.fillStyle = s.bgColor;
-      c.fillRect(0, 0, W, H);
-      drawGrain(c, 0.12);
-      const cy = s.caption.trim() ? sy(600) : sy(650);
-      const cut = cutouts[s.photo];
-      if (cut) {
-        const scale = (sy(950) / cut.naturalHeight) * (s.cutSize / 100) * s.zoom;
-        const w = cut.naturalWidth * scale, h = cut.naturalHeight * scale;
-        drawSticker(c, cut, 540 - w / 2 + s.ox / 100 * W, cy - h / 2 + s.oy / 100 * H, w, h, 18);
-      } else {
-        // fallback senza AI: finestra organica sulla foto
-        c.save();
-        blobPath(c, 540, cy, 400 * s.cutSize / 100, 500 * s.cutSize / 100, 7);
-        c.lineWidth = 26;
-        c.strokeStyle = '#f4efe4';
-        c.shadowColor = 'rgba(0,0,0,0.45)';
-        c.shadowBlur = 40;
-        c.shadowOffsetY = 14;
-        c.stroke();
-        c.shadowColor = 'transparent';
-        c.clip();
-        coverDraw(c, img, s.zoom, s.ox, s.oy);
-        c.restore();
-      }
-      if (s.caption.trim()) {
-        drawHand(c, { text: s.caption, x: 540, y: H - 180, size: 52 * (s.tsize || 100) / 100, rot: -2, color: s.capColor, hl: s.hlColor, hlStyle: s.hlCircle ? 'cerchio' : 'nastro', seed: 21 });
-      }
-      if (s.showLogo) drawLogo(c, W / 2, H - 78, 66, s.capColor);
-      drawGrain(c, 0.06);
-    }
-  },
-
-  {
     id: 'statement-blur',
     name: 'Statement su blur',
     hint: 'titolo rosso giustificato',
@@ -719,8 +590,8 @@ const TEMPLATES = [
     fields: [
       { key: 'headline', label: 'Headline', type: 'textarea', def: 'Because growth starts when someone feels your brand belongs.' },
       { key: 'blur', label: 'Sfocatura foto', type: 'range', def: 14, min: 0, max: 40 },
-      { key: 'txtColor', label: 'Colore testo', type: 'swatch', def: '#f43334' },
-      { key: 'hlColor', label: 'Evidenziatore (*parola* nel testo)', type: 'swatch', def: '#fef6e2' },
+      { key: 'txtColor', label: 'Colore testo', type: 'swatch', def: '#ee003a' },
+      { key: 'hlColor', label: 'Evidenziatore (*parola* nel testo)', type: 'swatch', def: '#f4efe4' },
       { key: 'hlCircle', label: 'Evidenzia a cerchio (invece del nastro)', type: 'check', def: false },
       { key: 'size', label: 'Corpo testo', type: 'range', def: 64, min: 40, max: 90 },
       { key: 'showLogo', label: 'Logo spark in basso', type: 'check', def: true },
@@ -753,9 +624,9 @@ const TEMPLATES = [
     defaultPhoto: 'assets/photo-azulejos.jpg',
     fields: [
       { key: 'headline', label: 'Headline', type: 'textarea', def: "You're not stuck because of what you did. You're stuck because you won't deal with it." },
-      { key: 'cardColor', label: 'Colore card', type: 'swatch', def: '#518fa6' },
-      { key: 'txtColor', label: 'Colore testo', type: 'swatch', def: '#fef6e2' },
-      { key: 'hlColor', label: 'Evidenziatore (*parola* nel testo)', type: 'swatch', def: '#ee6a2d' },
+      { key: 'cardColor', label: 'Colore card', type: 'swatch', def: '#639b98' },
+      { key: 'txtColor', label: 'Colore testo', type: 'swatch', def: '#f4efe4' },
+      { key: 'hlColor', label: 'Evidenziatore (*parola* nel testo)', type: 'swatch', def: '#ee003a' },
       { key: 'hlCircle', label: 'Evidenzia a cerchio (invece del nastro)', type: 'check', def: false },
       { key: 'cardW', label: 'Larghezza card', type: 'range', def: 620, min: 400, max: 900 },
       { key: 'cardH', label: 'Altezza card', type: 'range', def: 780, min: 400, max: 1600 },
@@ -794,60 +665,150 @@ const TEMPLATES = [
   },
 
   {
-    id: 'scatter',
-    name: 'Parole sparse',
-    hint: 'scritte grandi a mano + serif',
+    id: 'growth-engine',
+    name: 'Blocco Growth Engine',
+    hint: 'headline enorme + tag',
+    defaultPhoto: 'assets/photo-cafe.jpg',
+    fields: [
+      { key: 'headline', label: 'Headline (una parola per riga)', type: 'textarea', def: 'THE\nGROWTH\nENGINE' },
+      { key: 'tags', label: 'Tag (uno per riga)', type: 'textarea', def: 'CONTENT\nOUTBOUND\nSYSTEMS\nAI\nPEOPLE' },
+      { key: 'subcopy', label: 'Sottotesto (Helvetica)', type: 'textarea', def: 'Un motore di content e outbound che gira ogni giorno nella tua voce.' },
+      { key: 'bgMode', label: 'Sfondo', type: 'seg', def: 'cream',
+        options: [{ val: 'cream', label: 'Cream' }, { val: 'color', label: 'Colore' }, { val: 'photo', label: 'Foto' }] },
+      { key: 'bgColor', label: 'Colore sfondo (se "Colore")', type: 'swatch', def: '#df2620' },
+      { key: 'txtColor', label: 'Colore headline', type: 'swatch', def: '#1a1a1a' },
+      { key: 'accent', label: 'Colore tag / accento', type: 'swatch', def: '#ee003a' },
+      { key: 'hlColor', label: 'Evidenziatore (*parola* in headline)', type: 'swatch', def: '#ee003a' },
+      { key: 'hlCircle', label: 'Evidenzia a cerchio (invece del nastro)', type: 'check', def: false },
+      { key: 'showStar', label: 'Star spark accanto alla headline', type: 'check', def: false },
+    ],
+    draw(c, s, img) {
+      if (s.bgMode === 'photo') {
+        coverDraw(c, img, s.zoom, s.ox, s.oy);
+        c.save(); c.fillStyle = 'rgba(12,10,9,0.42)'; c.fillRect(0, 0, W, H); c.restore();
+      } else {
+        c.fillStyle = s.bgMode === 'color' ? s.bgColor : '#f4efe4';
+        c.fillRect(0, 0, W, H);
+      }
+      const T = (s.tsize || 100) / 100;
+      const M = 90;
+      const hlStyle = s.hlCircle ? 'cerchio' : 'nastro';
+      const headCol = s.bgMode === 'photo' ? '#f4efe4' : s.txtColor;  // su foto headline chiara, leggibile
+      const hd = drawStackHeadline(c, s.headline.split('\n'), M, sy(150), 200 * T, W - M * 2 - 120,
+        headCol, 800, 0.92, 'left', s.hlColor, hlStyle);
+      if (s.showStar) drawLogo(c, W - M - 46, sy(150) + hd.size * 0.5, 84, s.accent);
+      // colonna tag a destra, allineata all'inizio della headline
+      drawTagList(c, s.tags.split('\n'), W - M, sy(180), 22 * T, s.accent, { vertical: true, lh: 2.2, align: 'right', ls: 3, weight: 600 });
+      // sottotesto Helvetica in basso
+      if (s.subcopy.trim()) {
+        c.save();
+        setFont(c, 500, 34 * T, SANS);
+        c.fillStyle = s.bgMode === 'photo' ? '#f4efe4' : s.txtColor;
+        c.textBaseline = 'alphabetic';
+        const lines = wrapLines(c, s.subcopy, W - M * 2 - 260);
+        let cy = H - 150 - (lines.length - 1) * 46 * T;
+        lines.forEach(l => { c.fillText(l.join(' '), M, cy); cy += 46 * T; });
+        c.restore();
+      }
+      if (s.bgMode !== 'photo') drawGrain(c, 0.05);
+    }
+  },
+
+  {
+    id: 'text-card',
+    name: 'Card testo pieno',
+    hint: 'statement su colore, niente foto',
+    defaultPhoto: 'assets/photo-cafe.jpg',
+    fields: [
+      { key: 'eyebrow', label: 'Occhiello (piccolo, sopra)', type: 'text', def: '' },
+      { key: 'headline', label: 'Statement (una parola/riga per riga)', type: 'textarea', def: 'IDEAS\nMOVE\nPEOPLE.' },
+      { key: 'tags', label: 'Tag in basso (uno per riga)', type: 'textarea', def: '' },
+      { key: 'bgColor', label: 'Sfondo', type: 'swatch', def: '#df2620' },
+      { key: 'txtColor', label: 'Colore testo', type: 'swatch', def: '#f4efe4' },
+      { key: 'accent', label: 'Colore occhiello / tag', type: 'swatch', def: '#f4efe4' },
+      { key: 'hlColor', label: 'Evidenziatore (*parola* nel testo)', type: 'swatch', def: '#1a1a1a' },
+      { key: 'hlCircle', label: 'Evidenzia a cerchio (invece del nastro)', type: 'check', def: false },
+      { key: 'align', label: 'Allineamento', type: 'seg', def: 'left',
+        options: [{ val: 'left', label: 'Sinistra' }, { val: 'center', label: 'Centro' }] },
+      { key: 'showLogo', label: 'Logo spark in basso', type: 'check', def: false },
+    ],
+    draw(c, s, img) {
+      c.fillStyle = s.bgColor;
+      c.fillRect(0, 0, W, H);
+      drawGrain(c, 0.1);
+      const T = (s.tsize || 100) / 100;
+      const M = 90;
+      const al = s.align === 'center' ? 'center' : 'left';
+      const hx = al === 'center' ? W / 2 : M;
+      const hlStyle = s.hlCircle ? 'cerchio' : 'nastro';
+      if (s.eyebrow.trim()) {
+        c.save();
+        setFont(c, 600, 24 * T, SANS);
+        letterSpace(c, 4);
+        c.fillStyle = s.accent;
+        c.textAlign = al; c.textBaseline = 'alphabetic';
+        c.fillText(s.eyebrow.toUpperCase(), hx, sy(230));
+        letterSpace(c, 0);
+        c.restore();
+      }
+      // blocco headline centrato verticalmente
+      const rows = s.headline.split('\n').filter(l => l.trim());
+      let size = 200 * T;
+      for (const l of rows) size = Math.min(size, fitSize(c, stripMarks(l), 200 * T, W - M * 2, 800, SANS));
+      const blockH = rows.length * size * 0.98;
+      drawStackHeadline(c, rows, hx, (H - blockH) / 2 - size * 0.1, size, W - M * 2,
+        s.txtColor, 800, 0.98, al, s.hlColor, hlStyle);
+      drawTagList(c, s.tags.split('\n'), hx, H - 150, 22 * T, s.accent,
+        { vertical: false, align: al, ls: 3, weight: 600 });
+      if (s.showLogo) drawLogo(c, al === 'center' ? W / 2 : W - M - 30, H - 130, 60, s.accent);
+      drawGrain(c, 0.04);
+    }
+  },
+
+  {
+    id: 'hand-photo',
+    name: 'Frase a mano su foto',
+    hint: '1 foto + 1 frase scritta a mano',
     defaultPhoto: 'assets/photo-park.jpg',
     fields: [
-      { key: 'bigWords', label: 'Parole grandi (separa con spazi)', type: 'text', def: 'GO WITH THE FLOW' },
-      { key: 'centerText', label: 'Testo centrale serif', type: 'textarea', def: 'Stop living limited.\nStart building leverage.' },
-      { key: 'wordColor', label: 'Colore parole', type: 'swatch', def: '#fef6e2' },
-      { key: 'modern', label: 'Font moderno (Helvetica, niente corsivo)', type: 'check', def: false },
-      { key: 'hlColor', label: 'Evidenziatore (*parola* nel testo)', type: 'swatch', def: '#ee6a2d' },
+      { key: 'phrase', label: 'Frase (maiuscolo o minuscolo, come scrivi)', type: 'textarea', def: 'SLOW THINGS\nFAST MINDS' },
+      { key: 'font', label: 'Stile scrittura', type: 'seg', def: 'hand',
+        options: [{ val: 'hand', label: 'A mano' }, { val: 'script', label: 'Corsivo' }, { val: 'marker', label: 'Marker' }] },
+      { key: 'inkColor', label: 'Colore scritta', type: 'swatch', def: '#ee003a' },
+      { key: 'eyebrow', label: 'Occhiello sans (piccolo, in alto)', type: 'text', def: '' },
+      { key: 'posX', label: 'Posizione ↔', type: 'range', def: 50, min: 5, max: 95 },
+      { key: 'posY', label: 'Posizione ↕', type: 'range', def: 50, min: 5, max: 95 },
+      { key: 'phraseSize', label: 'Dimensione frase', type: 'range', def: 70, min: 30, max: 130 },
+      { key: 'rot', label: 'Rotazione', type: 'range', def: -5, min: -15, max: 15 },
+      { key: 'tint', label: 'Scurisci foto (leggibilità)', type: 'range', def: 22, min: 0, max: 70 },
+      { key: 'hlColor', label: 'Evidenziatore (*parola* nella frase)', type: 'swatch', def: '#f4efe4' },
       { key: 'hlCircle', label: 'Evidenzia a cerchio (invece del nastro)', type: 'check', def: false },
-      { key: 'seed', label: 'Disposizione (mescola)', type: 'range', def: 3, min: 1, max: 30 },
-      { key: 'showLogo', label: 'Logo spark in basso', type: 'check', def: true },
+      { key: 'showLogo', label: 'Logo spark in basso', type: 'check', def: false },
     ],
     draw(c, s, img) {
       coverDraw(c, img, s.zoom, s.ox, s.oy);
-      c.fillStyle = 'rgba(10,10,14,0.18)';
-      c.fillRect(0, 0, W, H);
-      const words = s.bigWords.split(/\s+/).filter(Boolean).slice(0, 8);
-      const anchors = [
-        [180, 220], [800, 300], [230, 560], [800, 880],
-        [280, 1010], [790, 1130], [520, 420], [520, 900]
-      ];
-      const rnd = mulberry32(s.seed * 97 + 13);
+      if (s.tint > 0) { c.save(); c.fillStyle = `rgba(12,10,9,${s.tint / 100})`; c.fillRect(0, 0, W, H); c.restore(); }
       const T = (s.tsize || 100) / 100;
-      const fam = s.modern ? SANS : SCRIPT;
-      const wgt = s.modern ? 700 : 400;
-      const base = s.modern ? 130 : 280;
-      words.forEach((w, i) => {
-        const [ax, ay] = anchors[i % anchors.length];
-        const word = s.modern ? w.toUpperCase() : w;
-        const size = fitSize(c, stripMarks(word), (base - rnd() * (base * 0.15)) * T, 480, wgt, fam);
-        drawHand(c, {
-          text: word,
-          x: ax + (rnd() - 0.5) * 60,
-          y: sy(ay) + (rnd() - 0.5) * 50,
-          size, rot: (rnd() - 0.5) * (s.modern ? 10 : 24),
-          color: s.wordColor, family: fam, weight: wgt,
-          jitter: !s.modern, hl: s.hlColor, hlStyle: s.hlCircle ? 'cerchio' : 'nastro', seed: s.seed + i
-        });
-      });
-      if (s.centerText.trim()) {
+      if (s.eyebrow.trim()) {
         c.save();
-        c.fillStyle = '#fdfaf2';
-        c.textAlign = 'center';
-        c.textBaseline = 'middle';
-        c.shadowColor = 'rgba(0,0,0,0.5)';
-        c.shadowBlur = 16;
-        setFont(c, 400, 46 * T, s.modern ? SANS : SERIF);
-        const lines = s.centerText.split('\n');
-        lines.forEach((l, i) => drawMarkedLine(c, l, 620, sy(700) + i * 62 * T, 46 * T, s.hlColor, 'center', 'middle', s.hlCircle ? 'cerchio' : 'nastro'));
+        setFont(c, 600, 24 * T, SANS);
+        letterSpace(c, 4);
+        c.fillStyle = s.inkColor;
+        c.textAlign = 'left'; c.textBaseline = 'alphabetic';
+        c.fillText(s.eyebrow.toUpperCase(), 90, sy(120));
+        letterSpace(c, 0);
         c.restore();
       }
-      if (s.showLogo) drawLogo(c, W / 2, H - 75, 60, s.wordColor);
+      drawHand(c, {
+        text: s.phrase,
+        x: s.posX / 100 * W, y: s.posY / 100 * H,
+        size: s.phraseSize * T, rot: s.rot,
+        color: s.inkColor,
+        family: s.font === 'script' ? SCRIPT : s.font === 'marker' ? MARKER : HAND,
+        weight: 400, jitter: s.font !== 'script',
+        hl: s.hlColor, hlStyle: s.hlCircle ? 'cerchio' : 'nastro', seed: 31,
+      });
+      if (s.showLogo) drawLogo(c, W / 2, H - 78, 60, s.inkColor);
       drawGrain(c, 0.06);
     }
   },
@@ -866,8 +827,8 @@ const TEMPLATES = [
         options: [{ val: 'cover', label: 'Cover' }, { val: 'prose', label: 'Racconto' }, { val: 'step', label: 'Step' }, { val: 'cta', label: 'CTA' }, { val: 'circle', label: 'Cerchio' }] },
       { key: 'title', scope: 'frame', label: 'Titolo del frame', type: 'textarea', def: 'Titolo del frame' },
       { key: 'body', scope: 'frame', label: 'Testo del frame', type: 'textarea', def: 'Testo del frame.\n- punto uno\n- punto due' },
-      { key: 'accent', scope: 'series', label: 'Colore testo', type: 'swatch', def: '#fef6e2' },
-      { key: 'hlColor', scope: 'series', label: 'Evidenziatore keyword (*parola* nel testo)', type: 'swatch', def: '#ee6a2d' },
+      { key: 'accent', scope: 'series', label: 'Colore testo', type: 'swatch', def: '#f4efe4' },
+      { key: 'hlColor', scope: 'series', label: 'Evidenziatore keyword (*parola* nel testo)', type: 'swatch', def: '#ee003a' },
       { key: 'hlCircle', scope: 'series', label: 'Evidenzia a cerchio (invece del nastro)', type: 'check', def: false },
       { key: 'textY', scope: 'series', label: 'Posizione testo racconto ↕ (0 alto, 100 basso)', type: 'range', def: 50, min: 15, max: 85 },
       { key: 'autonumber', scope: 'series', label: 'Numera gli step (1. 2. 3.)', type: 'check', def: true },
@@ -992,7 +953,7 @@ const TEMPLATES = [
       { key: 'body', label: 'Occhiello (piccolo, in alto a dx)', type: 'textarea', def: 'Un motore di content e outbound che gira ogni giorno nella tua voce, senza presidiarlo a mano.' },
       { key: 'cta', label: 'Pill in basso (vuoto = niente)', type: 'text', def: 'SCOPRI DI PIÙ' },
       { key: 'brand', label: 'Parola brand (vicino al logo)', type: 'text', def: 'data spark' },
-      { key: 'accent', label: 'Colore testo', type: 'swatch', def: '#fef6e2' },
+      { key: 'accent', label: 'Colore testo', type: 'swatch', def: '#f4efe4' },
       { key: 'tint', label: 'Scurisci foto', type: 'range', def: 45, min: 0, max: 100 },
       { key: 'showLogo', label: 'Logo spark in alto a dx', type: 'check', def: true },
     ],
@@ -1057,7 +1018,7 @@ const TEMPLATES = [
       { key: 'right', label: 'Parola a destra', type: 'text', def: 'outbound' },
       { key: 'bottom', label: 'Parola in basso', type: 'text', def: 'sistema' },
       { key: 'left', label: 'Parola a sinistra', type: 'text', def: 'crescita' },
-      { key: 'accent', label: 'Colore cerchio e testo', type: 'swatch', def: '#fef6e2' },
+      { key: 'accent', label: 'Colore cerchio e testo', type: 'swatch', def: '#f4efe4' },
       { key: 'ring', label: 'Dimensione cerchio', type: 'range', def: 30, min: 18, max: 42 },
       { key: 'cy', label: 'Posizione verticale', type: 'range', def: 46, min: 25, max: 70 },
       { key: 'tint', label: 'Scurisci foto', type: 'range', def: 30, min: 0, max: 100 },
@@ -1278,7 +1239,7 @@ function render() {
     } catch (e) {
       ctx.fillStyle = '#26262a';
       ctx.fillRect(0, 0, W, H);
-      ctx.fillStyle = '#f43334';
+      ctx.fillStyle = '#ee003a';
       ctx.font = '28px Inter';
       ctx.fillText('Foto non caricata: apri l\'app con start.command (serve il server locale)', 60, 120);
     }
@@ -1290,6 +1251,7 @@ const tplGrid = document.getElementById('tplGrid');
 const photoGrid = document.getElementById('photoGrid');
 const photoAdjust = document.getElementById('photoAdjust');
 const fieldsEl = document.getElementById('fields');
+const aiPhotoEl = document.getElementById('aiPhoto');
 const upload = document.getElementById('photoUpload');
 
 function buildTemplates() {
@@ -1335,6 +1297,54 @@ function buildPhotos() {
   up.title = 'Carica una tua foto (per il cutout usa un PNG senza sfondo)';
   up.onclick = () => upload.click();
   photoGrid.appendChild(up);
+}
+
+const aiState = { prompt: '', useFace: false };
+function buildAiPhoto() {
+  aiPhotoEl.innerHTML = '';
+  const mk = (html) => { const d = document.createElement('div'); d.innerHTML = html; return d.firstElementChild; };
+  // API key
+  const keyWrap = mk('<div class="field"><label>API key Gemini (una volta, resta sul tuo Mac)</label><input type="password" placeholder="incolla la key…"></div>');
+  const keyInp = keyWrap.querySelector('input');
+  keyInp.value = localStorage.getItem('geminiKey') || '';
+  keyInp.oninput = () => localStorage.setItem('geminiKey', keyInp.value.trim());
+  aiPhotoEl.appendChild(keyWrap);
+  // prompt
+  const pWrap = mk('<div class="field"><label>Scena (in inglese rende meglio)</label><textarea placeholder="es. a lone surfer at golden hour"></textarea></div>');
+  const pInp = pWrap.querySelector('textarea');
+  pInp.value = aiState.prompt;
+  pInp.oninput = () => aiState.prompt = pInp.value;
+  aiPhotoEl.appendChild(pWrap);
+  // preset chips
+  const chips = document.createElement('div');
+  chips.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;';
+  SCENE_PRESETS.forEach(s => {
+    const b = document.createElement('button');
+    b.textContent = s.label;
+    b.style.cssText = 'background:#26262a;color:var(--mist);border:1px solid #333;border-radius:6px;padding:6px 10px;font-size:11px;font-family:inherit;cursor:pointer;';
+    b.onclick = () => { aiState.prompt = s.prompt; pInp.value = s.prompt; };
+    chips.appendChild(b);
+  });
+  aiPhotoEl.appendChild(chips);
+  // usa la mia faccia
+  const faceLab = document.createElement('label');
+  faceLab.className = 'check';
+  const faceChk = document.createElement('input');
+  faceChk.type = 'checkbox'; faceChk.checked = aiState.useFace;
+  faceChk.onchange = () => aiState.useFace = faceChk.checked;
+  faceLab.append(faceChk, document.createTextNode(' Usa la mia faccia (dalla foto selezionata)'));
+  aiPhotoEl.appendChild(faceLab);
+  // status + generate
+  const status = document.createElement('div');
+  status.style.cssText = 'font-size:11px;color:#b6b394;margin:4px 0 8px;min-height:14px;';
+  const gen = document.createElement('button');
+  gen.className = 'btn ghost';
+  gen.textContent = '✨ Genera foto on-brand';
+  gen.onclick = () => generatePhoto(
+    { prompt: aiState.prompt, useFace: aiState.useFace, faceSrc: photoTarget().photo, format: FORMAT },
+    msg => status.textContent = msg
+  );
+  aiPhotoEl.append(gen, status);
 }
 
 upload.onchange = () => {
@@ -1597,6 +1607,7 @@ function buildFields() {
 function buildAll() {
   buildTemplates();
   buildPhotos();
+  buildAiPhoto();
   buildAdjust();
   buildFields();
   updateExportBtn();
@@ -1659,6 +1670,10 @@ render();
 // i font Google non si caricano da soli per il canvas: forza il load, poi ridisegna
 if (document.fonts) {
   Promise.all([
+    document.fonts.load("400 40px 'Reenie Beanie'"),
+    document.fonts.load("400 40px 'Shadows Into Light Two'"),
+    document.fonts.load("600 40px 'Caveat'"),
+    document.fonts.load("700 40px 'Caveat'"),
     document.fonts.load("400 40px 'Permanent Marker'"),
     document.fonts.load("400 40px 'Zeyada'"),
     document.fonts.load("400 40px 'La Belle Aurore'"),
@@ -1668,3 +1683,57 @@ if (document.fonts) {
     document.fonts.load("400 40px 'EB Garamond'"),
   ]).then(render).catch(render);
 }
+
+/* ---------- API programmatica (headless / flow) ----------
+   window.GS.render(spec) -> Promise<dataURL PNG>. Riusa lo stesso codice canvas dell'app.
+   spec = { template, format?, photo?, zoom?, ox?, oy?, tsize?, fields:{...} }
+   Non-series only (feed + cover/cerchio storia). Vedi board.example.json + render.mjs. */
+const _fontsReady = (document.fonts
+  ? Promise.all([
+      document.fonts.load("400 40px 'Reenie Beanie'"), document.fonts.load("400 40px 'Shadows Into Light Two'"),
+      document.fonts.load("600 40px 'Caveat'"), document.fonts.load("700 40px 'Caveat'"),
+      document.fonts.load("400 40px 'Permanent Marker'"), document.fonts.load("400 40px 'Zeyada'"),
+      document.fonts.load("400 40px 'La Belle Aurore'"), document.fonts.load("400 40px 'Shadows Into Light'"),
+      document.fonts.load("500 40px 'Archivo'"), document.fonts.load("700 40px 'Archivo'"),
+    ]).then(() => document.fonts.ready).catch(() => {})
+  : Promise.resolve());
+
+window.GS = {
+  fontsReady: _fontsReady,
+  templates() {
+    return TEMPLATES.map(t => ({
+      id: t.id, name: t.name, series: !!t.series, format: t.defaultFormat || '4:5',
+      fields: t.fields.filter(f => !['button', 'apikey'].includes(f.type))
+        .map(f => ({ key: f.key, type: f.type, def: f.def, ...(f.options ? { options: f.options.map(o => o.val) } : {}) })),
+    }));
+  },
+  async render(spec) {
+    const tpl = TEMPLATES.find(t => t.id === spec.template);
+    if (!tpl) throw new Error('template sconosciuto: ' + spec.template);
+    if (tpl.series) throw new Error('template series non supportato da render(): ' + spec.template);
+    const fmt = spec.format || tpl.defaultFormat || '4:5';
+    const prevH = H, prevW = canvas.width, prevHt = canvas.height;
+    H = fmt === '9:16' ? 1920 : 1350;
+    canvas.width = W; canvas.height = H;
+    const s = {
+      tsize: spec.tsize ?? 100, zoom: spec.zoom ?? 1, ox: spec.ox ?? 0, oy: spec.oy ?? 0,
+      photo: spec.photo || tpl.defaultPhoto,
+    };
+    tpl.fields.forEach(f => { s[f.key] = f.def; });
+    Object.assign(s, spec.fields || {});
+    try {
+      const img = await loadImg(s.photo);
+      ctx.save(); ctx.clearRect(0, 0, W, H);
+      tpl.draw(ctx, s, img);
+      ctx.restore();
+      return canvas.toDataURL('image/png');
+    } finally {
+      H = prevH; canvas.width = prevW; canvas.height = prevHt;
+    }
+  },
+  async renderAll(specs) {
+    const out = [];
+    for (const sp of specs) out.push(await this.render(sp));
+    return out;
+  },
+};
