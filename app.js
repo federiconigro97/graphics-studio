@@ -55,10 +55,55 @@ function mulberry32(a) {
 }
 
 function coverDraw(c, img, zoom, ox, oy) {
-  const iw = img.naturalWidth, ih = img.naturalHeight;
+  const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
   const s = Math.max(W / iw, H / ih) * zoom;
   const w = iw * s, h = ih * s;
   c.drawImage(img, (W - w) / 2 + ox / 100 * W, (H - h) / 2 + oy / 100 * H, w, h);
+}
+
+/* Grayscale + contrast/brightness a mano (getImageData). Serve perché ctx.filter
+   NON è supportato su Safari iOS / molti browser mobile → là il B/N non veniva applicato.
+   Ritorna un canvas offscreen (cacheato per src). */
+const _grayCache = {};
+function grayscaleCanvas(img, contrast = 1, brightness = 1) {
+  const src = img.src || img.dataset && img.dataset.gid || '';
+  const key = `${src}|${contrast}|${brightness}`;
+  if (src && _grayCache[key]) return _grayCache[key];
+  const w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+  const cv = document.createElement('canvas');
+  cv.width = w; cv.height = h;
+  const g = cv.getContext('2d');
+  g.drawImage(img, 0, 0, w, h);
+  const id = g.getImageData(0, 0, w, h), d = id.data;
+  for (let i = 0; i < d.length; i += 4) {
+    let v = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+    v = (v - 128) * contrast + 128;
+    v *= brightness;
+    v = v < 0 ? 0 : v > 255 ? 255 : v;
+    d[i] = d[i + 1] = d[i + 2] = v;
+  }
+  g.putImageData(id, 0, 0);
+  if (src) _grayCache[key] = cv;
+  return cv;
+}
+
+/* Cover-draw con sfocatura cross-browser (downscale→upscale, niente ctx.filter). */
+function coverDrawBlurred(c, img, zoom, ox, oy, blurPx) {
+  if (!blurPx || blurPx <= 0) { coverDraw(c, img, zoom, ox, oy); return; }
+  const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+  const down = Math.max(0.02, 1 / (1 + blurPx * 0.9));
+  const sw = Math.max(2, Math.round(iw * down)), sh = Math.max(2, Math.round(ih * down));
+  const off = document.createElement('canvas');
+  off.width = sw; off.height = sh;
+  const o = off.getContext('2d');
+  o.imageSmoothingEnabled = true; o.imageSmoothingQuality = 'high';
+  o.drawImage(img, 0, 0, sw, sh);
+  const s = Math.max(W / iw, H / ih) * zoom;
+  const w = iw * s, h = ih * s;
+  c.save();
+  c.imageSmoothingEnabled = true; c.imageSmoothingQuality = 'high';
+  c.drawImage(off, (W - w) / 2 + ox / 100 * W, (H - h) / 2 + oy / 100 * H, w, h);
+  c.restore();
 }
 
 function setFont(c, weight, size, family) {
@@ -549,16 +594,16 @@ const TEMPLATES = [
       { key: 'showLogo', label: 'Logo spark in basso', type: 'check', def: false },
     ],
     draw(c, s, img) {
+      // grayscale a mano (niente ctx.filter → funziona anche su Safari iOS / mobile)
+      const gray = grayscaleCanvas(img, 1.12, 1.05);
       c.save();
-      c.filter = 'grayscale(1) contrast(1.12) brightness(1.05)';
-      coverDraw(c, img, s.zoom, s.ox, s.oy);
+      coverDraw(c, gray, s.zoom, s.ox, s.oy);
       if (s.motion > 0) {
         c.globalAlpha = 0.14;
-        c.filter = `grayscale(1) contrast(1.12) brightness(1.05) blur(${s.motion / 6}px)`;
         for (let i = 1; i <= 7; i++) {
           const off = i * s.motion / 2.2;
-          c.save(); c.translate(off, 0); coverDraw(c, img, s.zoom, s.ox, s.oy); c.restore();
-          c.save(); c.translate(-off, 0); coverDraw(c, img, s.zoom, s.ox, s.oy); c.restore();
+          c.save(); c.translate(off, 0); coverDraw(c, gray, s.zoom, s.ox, s.oy); c.restore();
+          c.save(); c.translate(-off, 0); coverDraw(c, gray, s.zoom, s.ox, s.oy); c.restore();
         }
       }
       c.restore();
@@ -597,10 +642,8 @@ const TEMPLATES = [
       { key: 'showLogo', label: 'Logo spark in basso', type: 'check', def: true },
     ],
     draw(c, s, img) {
-      c.save();
-      c.filter = `blur(${s.blur}px) saturate(1.08) brightness(1.02)`;
-      coverDraw(c, img, s.zoom * (1 + s.blur / 200), s.ox, s.oy);
-      c.restore();
+      // sfocatura cross-browser (niente ctx.filter, che manca su Safari iOS / mobile)
+      coverDrawBlurred(c, img, s.zoom * (1 + s.blur / 200), s.ox, s.oy, s.blur);
       const size = s.size * (s.tsize || 100) / 100;
       setFont(c, 500, size, SANS);
       letterSpace(c, 2);
