@@ -106,6 +106,38 @@ function coverDrawBlurred(c, img, zoom, ox, oy, blurPx) {
   c.restore();
 }
 
+/* Slow-shutter / lunga esposizione: media temporale di N copie del soggetto in
+   movimento (traslazione + leggera rotazione/scala lungo un vettore, con easing e
+   una curva laterale) → smear direzionale organico invece del doppione orizzontale
+   rigido di blur-motion. Niente ctx.filter → funziona su Safari iOS / mobile. */
+function longExposureDraw(c, img, s, motion, angleDeg, swirlDeg) {
+  if (!motion || motion <= 0) { coverDraw(c, img, s.zoom, s.ox, s.oy); return; }
+  const N = 30;
+  const rad = angleDeg * Math.PI / 180;
+  const off = document.createElement('canvas');
+  off.width = W; off.height = H;
+  const o = off.getContext('2d');
+  o.imageSmoothingEnabled = true; o.imageSmoothingQuality = 'high';
+  for (let k = 0; k < N; k++) {
+    const t = k / (N - 1);
+    const ease = t * t;                       // accelera → base nitida, coda che sfuma
+    const perp = Math.sin(t * Math.PI) * motion * 0.14;  // curva laterale → traiettoria organica
+    const dx = Math.cos(rad) * motion * ease - Math.sin(rad) * perp;
+    const dy = Math.sin(rad) * motion * ease + Math.cos(rad) * perp;
+    const rot = swirlDeg * Math.PI / 180 * ease;
+    const scl = 1 + 0.05 * ease;
+    o.globalAlpha = 1 / (k + 1);              // media progressiva = mean(frame) = vera lunga esposizione
+    o.save();
+    o.translate(W / 2 + dx, H / 2 + dy);
+    o.rotate(rot);
+    o.scale(scl, scl);
+    o.translate(-W / 2, -H / 2);
+    coverDraw(o, img, s.zoom, s.ox, s.oy);
+    o.restore();
+  }
+  c.drawImage(off, 0, 0);
+}
+
 function setFont(c, weight, size, family) {
   c.font = `${weight} ${size}px ${family}`;
 }
@@ -607,6 +639,47 @@ const TEMPLATES = [
         }
       }
       c.restore();
+      const T = (s.tsize || 100) / 100;
+      c.save();
+      c.fillStyle = s.txtColor;
+      c.textBaseline = 'alphabetic';
+      letterSpace(c, 1.5 * T);
+      setFont(c, 700, 26 * T, SANS);
+      const credit = s.credit.toUpperCase().split('\n');
+      const hst = s.hlCircle ? 'cerchio' : 'nastro';
+      credit.forEach((l, i) => drawMarkedLine(c, l, 160, sy(640) + i * 34 * T, 26 * T, s.hlColor, 'left', 'alphabetic', hst));
+      drawMarkedLine(c, s.title.toUpperCase(), 590, sy(640), 26 * T, s.hlColor, 'left', 'alphabetic', hst);
+      setFont(c, 500, 26 * T, SANS);
+      const sub = wrapLines(c, s.subtitle.toUpperCase(), 400);
+      sub.forEach((l, i) => drawMarkedLine(c, l.join(' '), 590, sy(640) + (i + 1) * 34 * T, 26 * T, s.hlColor, 'left', 'alphabetic', hst));
+      letterSpace(c, 0);
+      c.restore();
+      if (s.showLogo) drawLogo(c, W / 2, H - 80, 60, s.txtColor);
+      drawGrain(c, 0.07);
+    }
+  },
+
+  {
+    id: 'blur-longexp',
+    name: 'Blur B/N slow-shutter',
+    hint: 'lunga esposizione, smear organico',
+    defaultPhoto: 'assets/photo-azulejos.jpg',
+    fields: [
+      { key: 'credit', label: 'Credit a sx', type: 'textarea', def: 'FEDERICO NIGRO\nDATA SPARK' },
+      { key: 'title', label: 'Titolo a dx', type: 'text', def: 'BUILT IN MOTION' },
+      { key: 'subtitle', label: 'Sottotitolo a dx', type: 'text', def: 'A MOMENT CAPTURED ON THE FAST LANE' },
+      { key: 'motion', label: 'Lunghezza esposizione', type: 'range', def: 40, min: 0, max: 90 },
+      { key: 'angle', label: 'Direzione (gradi)', type: 'range', def: -80, min: -180, max: 180 },
+      { key: 'swirl', label: 'Rotazione organica', type: 'range', def: 5, min: 0, max: 20 },
+      { key: 'txtColor', label: 'Colore testo', type: 'swatch', def: '#ee003a' },
+      { key: 'hlColor', label: 'Evidenziatore (*parola* nel testo)', type: 'swatch', def: '#f4efe4' },
+      { key: 'hlCircle', label: 'Evidenzia a cerchio (invece del nastro)', type: 'check', def: false },
+      { key: 'showLogo', label: 'Logo spark in basso', type: 'check', def: false },
+    ],
+    draw(c, s, img) {
+      // grayscale a mano (niente ctx.filter → funziona anche su Safari iOS / mobile)
+      const gray = grayscaleCanvas(img, 1.12, 1.05);
+      longExposureDraw(c, gray, s, s.motion, s.angle, s.swirl);
       const T = (s.tsize || 100) / 100;
       c.save();
       c.fillStyle = s.txtColor;
