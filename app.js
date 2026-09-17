@@ -1730,11 +1730,54 @@ function buildAll() {
 }
 
 /* ---------- export ---------- */
-function exportSingle() {
+const isMobile = () => /iphone|ipad|ipod|android/i.test(navigator.userAgent);
+
+/* Salvataggio cross-device. iOS Safari IGNORA l'attributo <a download> e su http
+   via IP LAN navigator.share non c'è (serve secure context). Quindi:
+   1) share sheet nativo se disponibile (https/localhost) → "Salva immagine";
+   2) mobile senza share → overlay: tieni premuto sull'immagine per salvarla (va anche http);
+   3) desktop → download classico da blob. */
+async function saveBlob(blob, filename) {
+  try {
+    const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file] });
+      return;
+    }
+  } catch (e) { if (e && e.name === 'AbortError') return; }  // utente ha annullato lo share
+  if (isMobile() && (blob.type || '').startsWith('image/')) { showSaveOverlay(blob, filename); return; }
+  const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.download = `dataspark-${current.id}-${FORMAT.replace(':', 'x')}-${new Date().toISOString().slice(0, 10)}.png`;
-  a.href = canvas.toDataURL('image/png');
-  a.click();
+  a.download = filename; a.href = url; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
+function showSaveOverlay(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:20px;box-sizing:border-box';
+  const img = document.createElement('img');
+  img.src = url;
+  img.style.cssText = 'max-width:100%;max-height:76vh;border-radius:6px;box-shadow:0 8px 40px rgba(0,0,0,.5)';
+  const tip = document.createElement('div');
+  tip.textContent = 'Tieni premuto sull’immagine → Salva foto. Tocca fuori per chiudere.';
+  tip.style.cssText = 'color:#f4efe4;font:500 15px/1.4 ' + SANS + ';text-align:center;max-width:320px';
+  ov.appendChild(img); ov.appendChild(tip);
+  ov.addEventListener('click', e => {
+    if (e.target !== img) { document.body.removeChild(ov); URL.revokeObjectURL(url); }
+  });
+  document.body.appendChild(ov);
+}
+
+async function exportSingle() {
+  const name = `dataspark-${current.id}-${FORMAT.replace(':', 'x')}-${new Date().toISOString().slice(0, 10)}.png`;
+  const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
+  if (!blob) {  // fallback estremo
+    const a = document.createElement('a');
+    a.download = name; a.href = canvas.toDataURL('image/png'); a.click();
+    return;
+  }
+  await saveBlob(blob, name);
 }
 
 async function exportSeries() {
@@ -1759,18 +1802,12 @@ async function exportSeries() {
     const zip = new JSZip();
     shots.forEach(sh => zip.file(sh.name, sh.data.split(',')[1], { base64: true }));
     const blob = await zip.generateAsync({ type: 'blob' });
-    const a = document.createElement('a');
-    a.download = `dataspark-storie-${date}.zip`;
-    a.href = URL.createObjectURL(blob);
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    await saveBlob(blob, `dataspark-storie-${date}.zip`);
   } catch (e) {
-    // fallback offline: download singoli scaglionati
+    // fallback offline: salva i singoli PNG uno per uno (share/overlay/download secondo device)
     for (const sh of shots) {
-      const a = document.createElement('a');
-      a.download = `dataspark-${date}-${sh.name}`;
-      a.href = sh.data;
-      a.click();
+      const b = await (await fetch(sh.data)).blob();
+      await saveBlob(b, `dataspark-${date}-${sh.name}`);
       await new Promise(r => setTimeout(r, 400));
     }
   }
